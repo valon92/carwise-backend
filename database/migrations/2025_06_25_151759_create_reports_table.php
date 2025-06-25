@@ -13,6 +13,12 @@ return new class extends Migration
     {
         Schema::create('reports', function (Blueprint $table) {
             $table->id();
+            $table->string('description');
+        $table->string('brand');
+        $table->string('model');
+        $table->integer('year');
+        $table->string('vin')->nullable();
+        $table->json('images')->nullable(); // nëse përdorim ruajtje të imazheve në të ardhmen
             $table->timestamps();
         });
     }
