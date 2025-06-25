@@ -12,7 +12,8 @@ class ReportController extends Controller
      */
     public function index()
     {
-        //
+        return Report::latest()->get();
+
     }
 
     /**
@@ -28,15 +29,27 @@ class ReportController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        $validated = $request->validate([
+            'description' => 'required|string',
+            'brand' => 'required|string',
+            'model' => 'required|string',
+            'year' => 'required|integer',
+            'vin' => 'nullable|string',
+            'images' => 'nullable|array',
+        ]);
+
+        $report = Report::create($validated);
+
+        return response()->json($report, 201);
     }
 
     /**
      * Display the specified resource.
      */
-    public function show(Report $report)
+    public function show($id)
     {
-        //
+        $report = Report::findOrFail($id);
+        return response()->json($report);
     }
 
     /**
