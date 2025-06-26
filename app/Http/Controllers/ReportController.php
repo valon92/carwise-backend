@@ -8,81 +8,63 @@ use Illuminate\Http\Request;
 class ReportController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * Shfaq të gjitha raportet.
      */
     public function index()
     {
         return Report::latest()->get();
-
     }
 
     /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        //
-    }
-
-    /**
-     * Store a newly created resource in storage.
+     * Ruaj një raport të ri.
      */
     public function store(Request $request)
     {
         $validated = $request->validate([
             'description' => 'required|string',
+            'vehicle' => 'required|array',
             'vehicle.brand' => 'required|string',
             'vehicle.model' => 'required|string',
             'vehicle.year' => 'required|integer',
             'vehicle.vin' => 'nullable|string',
         ]);
-    
-        $report = Report::create([
-            'description' => $validated['description'],
-            'vehicle' => $validated['vehicle'],
-        ]);
-    
+
+        $report = new Report();
+        $report->description = $validated['description'];
+        $report->vehicle_info = json_encode($validated['vehicle']);
+        $report->user_id = auth()->id(); // e lidh me userin që është kyçur
+        $report->save();
+
         return response()->json($report, 201);
     }
-    
 
     /**
-     * Display the specified resource.
+     * Shfaq një raport sipas ID-së.
      */
     public function show($id)
     {
         $report = Report::find($id);
-    
+
         if (!$report) {
             return response()->json(['message' => 'Raporti nuk u gjet'], 404);
         }
-    
+
         return response()->json($report);
     }
-    
-
 
     /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(Report $report)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
+     * Përditëso një raport (opsionale në këtë fazë).
      */
     public function update(Request $request, Report $report)
     {
-        //
+        // opsionale për të ardhmen
     }
 
     /**
-     * Remove the specified resource from storage.
+     * Fshij një raport (opsionale).
      */
     public function destroy(Report $report)
     {
-        //
+        // opsionale për të ardhmen
     }
 }
