@@ -31,26 +31,36 @@ class ReportController extends Controller
     {
         $validated = $request->validate([
             'description' => 'required|string',
-            'brand' => 'required|string',
-            'model' => 'required|string',
-            'year' => 'required|integer',
-            'vin' => 'nullable|string',
-            'images' => 'nullable|array',
+            'vehicle.brand' => 'required|string',
+            'vehicle.model' => 'required|string',
+            'vehicle.year' => 'required|integer',
+            'vehicle.vin' => 'nullable|string',
         ]);
-
-        $report = Report::create($validated);
-
+    
+        $report = Report::create([
+            'description' => $validated['description'],
+            'vehicle' => $validated['vehicle'],
+        ]);
+    
         return response()->json($report, 201);
     }
+    
 
     /**
      * Display the specified resource.
      */
     public function show($id)
     {
-        $report = Report::findOrFail($id);
+        $report = Report::find($id);
+    
+        if (!$report) {
+            return response()->json(['message' => 'Raporti nuk u gjet'], 404);
+        }
+    
         return response()->json($report);
     }
+    
+
 
     /**
      * Show the form for editing the specified resource.
