@@ -11,9 +11,11 @@ Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logo
 
 // ✅ Rrugët për raportet
 Route::middleware('auth:sanctum')->group(function () {
-    Route::prefix('reports')->group(function () {
+        Route::prefix('reports')->group(function () {
         Route::post('/', [ReportController::class, 'store']);     // krijo raport
         Route::get('/', [ReportController::class, 'index']);      // lista e raporteve
         Route::get('/{id}', [ReportController::class, 'show']);   // shfaq një raport
+        Route::get('/my', [ReportController::class, 'myReports']); // lista e raporteve vetëm për përdoruesin aktual
+
     });
 });

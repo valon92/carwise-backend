@@ -67,4 +67,12 @@ class ReportController extends Controller
     {
         // opsionale për të ardhmen
     }
+    public function myReports()
+{
+    $user = auth()->user();
+    $reports = Report::where('user_id', $user->id)->latest()->get();
+
+    return response()->json($reports);
+}
+
 }
