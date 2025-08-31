@@ -12,15 +12,15 @@
                 </div>
                 <div class="flex items-center space-x-3">
                     <Link
-                        :href="route('reports.edit', report.id)"
-                        class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+                        :href="`/reports/${report.id}/edit`"
+                        class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 focus:bg-blue-700 active:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition ease-in-out duration-150"
                     >
                         <PencilIcon class="w-4 h-4 mr-2" />
                         Edito
                     </Link>
                     <Link
-                        :href="route('reports.index')"
-                        class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+                        href="/reports"
+                        class="inline-flex items-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 focus:bg-gray-700 active:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150"
                     >
                         <ArrowLeftIcon class="w-4 h-4 mr-2" />
                         Kthehu
@@ -475,7 +475,7 @@ const getDrivingText = (driving) => {
 
 const markAsCompleted = async () => {
     try {
-        await router.put(route('reports.update', props.report.id), {
+        await router.put(`/reports/${props.report.id}`, {
             status: 'completed'
         });
     } catch (error) {
@@ -485,7 +485,7 @@ const markAsCompleted = async () => {
 
 const markAsUrgent = async () => {
     try {
-        await router.put(route('reports.update', props.report.id), {
+        await router.put(`/reports/${props.report.id}`, {
             status: 'urgent'
         });
     } catch (error) {
@@ -495,7 +495,7 @@ const markAsUrgent = async () => {
 
 const markAsInProgress = async () => {
     try {
-        await router.put(route('reports.update', props.report.id), {
+        await router.put(`/reports/${props.report.id}`, {
             status: 'in_progress'
         });
     } catch (error) {

@@ -12,14 +12,14 @@
                 </div>
                 <div class="flex items-center space-x-3">
                     <Link
-                        :href="route('reports.show', report.id)"
+                        :href="`/reports/${report.id}`"
                         class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
                     >
                         <EyeIcon class="w-4 h-4 mr-2" />
                         Shiko Detajet
                     </Link>
                     <Link
-                        :href="route('reports.index')"
+                        href="/reports"
                         class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
                     >
                         <ArrowLeftIcon class="w-4 h-4 mr-2" />
@@ -458,7 +458,7 @@
                         <!-- Submit Button -->
                         <div class="flex items-center justify-end space-x-4 pt-6 border-t border-gray-200">
                             <Link
-                                :href="route('reports.show', report.id)"
+                                :href="`/reports/${report.id}`"
                                 class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
                             >
                                 Anulo
@@ -544,6 +544,6 @@ const form = useForm({
 });
 
 const submit = () => {
-    form.put(route('reports.update', props.report.id));
+    form.put(`/reports/${props.report.id}`);
 };
 </script>

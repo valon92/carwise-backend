@@ -191,7 +191,7 @@ const messageForm = useForm({
 
 const sendMessage = () => {
     if (messageForm.message.trim()) {
-        messageForm.post(route('ai.process-message'), {
+        messageForm.post('/ai/chat/message', {
             onSuccess: () => {
                 messageForm.reset();
                 scrollToBottom();

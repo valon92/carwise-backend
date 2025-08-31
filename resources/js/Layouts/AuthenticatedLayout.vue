@@ -25,17 +25,17 @@ const showingUserDropdown = ref(false);
 const user = computed(() => page.props.auth.user);
 
 const navigation = [
-    { name: 'Dashboard', href: route('dashboard'), icon: HomeIcon, current: route().current('dashboard') },
-    { name: 'Vehicles', href: route('vehicles.index'), icon: TruckIcon, current: route().current('vehicles.*') },
-    { name: 'Reports', href: route('reports.index'), icon: DocumentTextIcon, current: route().current('reports.*') },
-    { name: 'AI Chat', href: route('ai.chat'), icon: ChatBubbleLeftRightIcon, current: route().current('ai.chat') },
-    { name: 'Analytics', href: route('ai.analytics'), icon: ChartBarIcon, current: route().current('ai.analytics') },
+    { name: 'Dashboard', href: '/dashboard', icon: HomeIcon, current: $page.url.startsWith('/dashboard') },
+    { name: 'Vehicles', href: '/vehicles', icon: TruckIcon, current: $page.url.startsWith('/vehicles') },
+    { name: 'Reports', href: '/reports', icon: DocumentTextIcon, current: $page.url.startsWith('/reports') },
+    { name: 'AI Chat', href: '/ai/chat', icon: ChatBubbleLeftRightIcon, current: $page.url.startsWith('/ai/chat') },
+    { name: 'Analytics', href: '/ai/analytics', icon: ChartBarIcon, current: $page.url.startsWith('/ai/analytics') },
 ];
 
 const userNavigation = [
-    { name: 'Your Profile', href: route('profile.edit') },
+    { name: 'Your Profile', href: '/profile' },
     { name: 'Settings', href: '#' },
-    { name: 'Sign out', href: route('logout'), method: 'post' },
+    { name: 'Sign out', href: '/logout', method: 'post' },
 ];
 </script>
 
@@ -60,7 +60,7 @@ const userNavigation = [
                     
                     <div class="flex grow flex-col gap-y-5 overflow-y-auto bg-white px-6 pb-4">
                         <div class="flex h-16 shrink-0 items-center">
-                            <Link :href="route('dashboard')" class="flex items-center">
+                            <Link href="/dashboard" class="flex items-center">
                                 <div class="h-8 w-8 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center">
                                     <span class="text-white font-bold text-lg">🚗</span>
                                 </div>
@@ -104,7 +104,7 @@ const userNavigation = [
         <div class="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
             <div class="flex grow flex-col gap-y-5 overflow-y-auto border-r border-gray-200 bg-white px-6 pb-4">
                 <div class="flex h-16 shrink-0 items-center">
-                    <Link :href="route('dashboard')" class="flex items-center">
+                    <Link href="/dashboard" class="flex items-center">
                         <div class="h-8 w-8 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center">
                             <span class="text-white font-bold text-lg">🚗</span>
                         </div>
@@ -139,7 +139,7 @@ const userNavigation = [
                         </li>
                         <li class="mt-auto">
                             <Link
-                                :href="route('profile.edit')"
+                                href="/profile"
                                 class="group -mx-2 flex gap-x-3 rounded-md p-2 text-sm font-semibold leading-6 text-gray-700 hover:bg-gray-50 hover:text-blue-600"
                             >
                                 <Cog6ToothIcon

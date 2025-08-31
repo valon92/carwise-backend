@@ -11,8 +11,8 @@
                     </p>
                 </div>
                 <Link
-                    :href="route('reports.index')"
-                    class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+                    href="/reports"
+                    class="inline-flex items-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 focus:bg-gray-700 active:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150"
                 >
                     <ArrowLeftIcon class="w-4 h-4 mr-2" />
                     Kthehu
@@ -355,7 +355,7 @@
                         <!-- Submit Button -->
                         <div class="flex items-center justify-end space-x-4 pt-6 border-t border-gray-200">
                             <Link
-                                :href="route('reports.index')"
+                                href="/reports"
                                 class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
                             >
                                 Anulo
@@ -436,6 +436,12 @@ const form = useForm({
 });
 
 const submit = () => {
-    form.post(route('reports.store'));
+    form.post('/reports', {
+        onSuccess: () => {
+            // Optionally, you can redirect or show a success message here
+            // For now, we'll just show a success message in the console
+            console.log('Report created successfully!');
+        }
+    });
 };
 </script>

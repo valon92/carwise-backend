@@ -46,7 +46,7 @@ defineProps({
                                 <div class="rounded-lg shadow-lg">
                                     <Link
                                         v-if="canRegister"
-                                        :href="route('register')"
+                                        href="/register"
                                         class="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 md:py-4 md:text-lg md:px-10 transition-all duration-200 shadow-lg hover:shadow-xl"
                                     >
                                         Regjistrohu Falas
@@ -54,7 +54,7 @@ defineProps({
                                 </div>
                                 <div class="mt-3 sm:mt-0 sm:ml-3">
                                     <Link
-                                        :href="route('login')"
+                                        href="/login"
                                         class="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-lg text-blue-700 bg-blue-100 hover:bg-blue-200 md:py-4 md:text-lg md:px-10 transition-all duration-200"
                                     >
                                         Kyçu

@@ -25,7 +25,7 @@ const showPassword = ref(false);
 const showConfirmPassword = ref(false);
 
 const submit = () => {
-    form.post(route('register'), {
+            form.post('/register', {
         onFinish: () => form.reset('password', 'password_confirmation'),
     });
 };
@@ -176,7 +176,7 @@ const submit = () => {
                 <p class="text-sm text-gray-600">
                     Already have an account?
                     <Link
-                        :href="route('login')"
+                        href="/login"
                         class="font-medium text-blue-600 hover:text-blue-500 transition-colors"
                     >
                         Sign in here

@@ -12,14 +12,14 @@
                 </div>
                 <div class="flex items-center space-x-3">
                     <Link
-                        :href="route('vehicles.edit', vehicle.id)"
+                        :href="`/vehicles/${vehicle.id}/edit`"
                         class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
                     >
                         <PencilIcon class="w-4 h-4 mr-2" />
                         Edito
                     </Link>
                     <Link
-                        :href="route('vehicles.index')"
+                        href="/vehicles"
                         class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
                     >
                         <ArrowLeftIcon class="w-4 h-4 mr-2" />
@@ -242,7 +242,7 @@
                                 Raportet e Automjetit
                             </h3>
                             <Link
-                                :href="route('reports.create')"
+                                href="/reports/create"
                                 class="inline-flex items-center px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 border border-transparent rounded-lg font-semibold text-xs text-white uppercase tracking-widest hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150"
                             >
                                 <PlusIcon class="w-4 h-4 mr-2" />
@@ -314,7 +314,7 @@
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                             <Link
-                                                :href="route('reports.show', report.id)"
+                                                :href="`/reports/${report.id}`"
                                                 class="text-indigo-600 hover:text-indigo-900"
                                             >
                                                 Shiko
@@ -332,7 +332,7 @@
                                 Ky automjet nuk ka raporte të krijuara ende.
                             </p>
                             <Link
-                                :href="route('reports.create')"
+                                href="/reports/create"
                                 class="inline-flex items-center px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 border border-transparent rounded-lg font-semibold text-xs text-white uppercase tracking-widest hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150"
                             >
                                 <PlusIcon class="w-4 h-4 mr-2" />
@@ -543,7 +543,7 @@ const getStatusText = (status) => {
 };
 
 const addServiceRecord = () => {
-    serviceForm.post(route('vehicles.service', props.vehicle.id), {
+    serviceForm.post(`/vehicles/${props.vehicle.id}/service`, {
         onSuccess: () => {
             showServiceModal.value = false;
             serviceForm.reset();

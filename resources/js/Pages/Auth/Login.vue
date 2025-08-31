@@ -32,7 +32,7 @@ const form = useForm({
 const showPassword = ref(false);
 
 const submit = () => {
-    form.post(route('login'), {
+            form.post('/login', {
         onFinish: () => form.reset('password'),
     });
 };
@@ -122,7 +122,7 @@ const submit = () => {
                 <div class="text-sm">
                     <Link
                         v-if="canResetPassword"
-                        :href="route('password.request')"
+                        href="/forgot-password"
                         class="font-medium text-blue-600 hover:text-blue-500 transition-colors"
                     >
                         Forgot your password?
@@ -148,7 +148,7 @@ const submit = () => {
                 <p class="text-sm text-gray-600">
                     Don't have an account?
                     <Link
-                        :href="route('register')"
+                        href="/register"
                         class="font-medium text-blue-600 hover:text-blue-500 transition-colors"
                     >
                         Sign up for free

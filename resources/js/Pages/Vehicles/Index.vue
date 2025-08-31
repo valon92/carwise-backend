@@ -11,8 +11,8 @@
                     </p>
                 </div>
                 <Link
-                    :href="route('vehicles.create')"
-                    class="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 border border-transparent rounded-lg font-semibold text-xs text-white uppercase tracking-widest hover:from-blue-700 hover:to-indigo-700 focus:bg-gray-700 active:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150"
+                    href="/vehicles/create"
+                    class="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 border border-transparent rounded-lg font-semibold text-xs text-white uppercase tracking-widest hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition ease-in-out duration-150"
                 >
                     <PlusIcon class="w-4 h-4 mr-2" />
                     Shto Automjet
@@ -161,14 +161,14 @@
                             <div class="mt-6 flex items-center justify-between">
                                 <div class="flex space-x-2">
                                     <Link
-                                        :href="route('vehicles.show', vehicle.id)"
+                                        :href="`/vehicles/${vehicle.id}`"
                                         class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
                                     >
                                         <EyeIcon class="w-4 h-4 mr-1" />
                                         Shiko
                                     </Link>
                                     <Link
-                                        :href="route('vehicles.edit', vehicle.id)"
+                                        :href="`/vehicles/${vehicle.id}/edit`"
                                         class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
                                     >
                                         <PencilIcon class="w-4 h-4 mr-1" />
@@ -199,8 +199,8 @@
                     </p>
                     <div class="mt-6">
                         <Link
-                            :href="route('vehicles.create')"
-                            class="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 border border-transparent rounded-lg font-semibold text-xs text-white uppercase tracking-widest hover:from-blue-700 hover:to-indigo-700 focus:bg-gray-700 active:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150"
+                            href="/vehicles/create"
+                            class="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 border border-transparent rounded-lg font-semibold text-xs text-white uppercase tracking-widest hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition ease-in-out duration-150"
                         >
                             <PlusIcon class="w-4 h-4 mr-2" />
                             Shto Automjetin të Parë
@@ -262,7 +262,7 @@ const isServiceDueSoon = (date) => {
 
 const markAsPrimary = async (vehicle) => {
     try {
-        const response = await fetch(route('vehicles.primary', vehicle.id), {
+        const response = await fetch(`/vehicles/${vehicle.id}/primary`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
