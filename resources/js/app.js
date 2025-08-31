@@ -29,8 +29,13 @@ function route(name, params = {}) {
     return Ziggy.url + '/' + url.replace(/^\/+/, '');
 }
 
-// Make route available globally
-window.route = route;
+// Create a Vue plugin for route helper
+const RoutePlugin = {
+    install(app) {
+        app.config.globalProperties.route = route;
+        app.provide('route', route);
+    }
+};
 
 createInertiaApp({
     title: (title) => `${title} - ${appName}`,
@@ -38,6 +43,7 @@ createInertiaApp({
     setup({ el, App, props, plugin }) {
         return createApp({ render: () => h(App, props) })
             .use(plugin)
+            .use(RoutePlugin)
             .mount(el);
     },
     progress: {
