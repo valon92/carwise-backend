@@ -1,9 +1,7 @@
 <template>
     <Head title="AI Analytics - CarWise" />
 
-    <div class="min-h-screen bg-gray-50">
-        <!-- Navigation -->
-        <nav class="bg-white shadow-sm border-b border-gray-200">
+    <AuthenticatedLayout>
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex justify-between h-16">
                     <div class="flex items-center">
@@ -28,7 +26,6 @@
                     </div>
                 </div>
             </div>
-        </nav>
 
         <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
             <!-- Header -->
@@ -294,11 +291,12 @@
                 </div>
             </div>
         </div>
-    </div>
+    </AuthenticatedLayout>
 </template>
 
 <script setup>
 import { Head, Link } from '@inertiajs/vue3'
+import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
 
 const props = defineProps({
     analytics: Object

@@ -92,15 +92,16 @@ class User extends Authenticatable implements HasMedia
         return $this->hasMany(Report::class, 'assigned_to');
     }
 
-    public function comments()
-    {
-        return $this->hasMany(ReportComment::class);
-    }
+    // Remove non-existent relationships
+    // public function comments()
+    // {
+    //     return $this->hasMany(ReportComment::class);
+    // }
 
-    public function notifications()
-    {
-        return $this->hasMany(Notification::class);
-    }
+    // public function notifications()
+    // {
+    //     return $this->hasMany(Notification::class);
+    // }
 
     public function vehicles()
     {
@@ -112,10 +113,10 @@ class User extends Authenticatable implements HasMedia
         return $this->hasMany(AiChat::class);
     }
 
-    public function favorites()
-    {
-        return $this->hasMany(Favorite::class);
-    }
+    // public function favorites()
+    // {
+    //     return $this->hasMany(Favorite::class);
+    // }
 
     // Scopes
     public function scopeActive($query)
@@ -186,10 +187,11 @@ class User extends Authenticatable implements HasMedia
         $this->update(['last_login_at' => now()]);
     }
 
-    public function getUnreadNotificationsCount()
-    {
-        return $this->notifications()->where('read_at', null)->count();
-    }
+    // Remove method that uses non-existent notifications relationship
+    // public function getUnreadNotificationsCount()
+    // {
+    //     return $this->notifications()->where('read_at', null)->count();
+    // }
 
     public function getReportsStats()
     {
@@ -243,7 +245,7 @@ class User extends Authenticatable implements HasMedia
     // AI Methods
     public function getAiInsights()
     {
-        $reports = $this->reports()->with('comments')->get();
+        $reports = $this->reports()->get(); // Remove with('comments')
         
         return [
             'total_reports' => $reports->count(),

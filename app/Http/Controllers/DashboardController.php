@@ -2,18 +2,18 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Report;
-use App\Models\Vehicle;
 use App\Models\User;
+use App\Models\Vehicle;
+use App\Models\Report;
 use App\Services\AiService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\Response;
 use Inertia\Inertia;
-use Inertia\Response;
+use Illuminate\Support\Facades\Auth;
 
 class DashboardController extends Controller
 {
-    protected AiService $aiService;
+    protected $aiService;
 
     public function __construct(AiService $aiService)
     {
@@ -21,351 +21,146 @@ class DashboardController extends Controller
         $this->middleware('auth');
     }
 
-    /**
-     * Show the main dashboard
-     */
     public function index(): Response
     {
         $user = Auth::user();
         
         // Get user statistics
-        $userStats = $user->getReportsStats();
-        $assignedStats = $user->getAssignedReportsStats();
-        
-        // Get AI insights
-        $aiInsights = $this->aiService->getUserInsights($user);
-        
+        $stats = [
+            'user' => [
+                'total' => $user->reports()->count(),
+                'pending' => $user->reports()->where('status', 'pending')->count(),
+                'in_progress' => $user->reports()->where('status', 'in_progress')->count(),
+                'completed' => $user->reports()->where('status', 'completed')->count(),
+                'urgent' => $user->reports()->where('priority', 'high')->count(),
+            ],
+            'vehicles' => [
+                'total' => $user->vehicles()->count(),
+                'active' => $user->vehicles()->where('status', 'active')->count(),
+                'needs_service' => $user->vehicles()->needsService()->count(),
+            ],
+            'ai' => [
+                'total_chats' => $user->aiChats()->count(),
+                'avg_confidence' => $user->aiChats()->avg('confidence') ?? 0,
+            ]
+        ];
+
         // Get recent reports
-        $recentReports = $user->reports()
-            ->with(['assignedTechnician'])
+        $recent_reports = $user->reports()
+            ->with('vehicle')
             ->latest()
-            ->limit(5)
-            ->get();
-            
+            ->take(5)
+            ->get()
+            ->map(function ($report) {
+                return [
+                    'id' => $report->id,
+                    'title' => $report->title,
+                    'status' => $report->status,
+                    'priority' => $report->priority,
+                    'created_at' => $report->created_at,
+                    'brand' => $report->vehicle->brand ?? 'N/A',
+                    'model' => $report->vehicle->model ?? 'N/A',
+                    'year' => $report->vehicle->year ?? 'N/A',
+                ];
+            });
+
         // Get urgent reports
-        $urgentReports = $user->reports()
-            ->where('is_urgent', true)
-            ->whereIn('status', ['pending', 'in_progress'])
+        $urgent_reports = $user->reports()
+            ->where('priority', 'high')
+            ->with('vehicle')
             ->latest()
-            ->limit(3)
+            ->take(3)
             ->get();
-            
-        // Get vehicles that need service
-        $vehiclesNeedingService = $user->vehicles()
+
+        // Get vehicles needing service
+        $vehicles_needing_service = $user->vehicles()
             ->needsService()
-            ->limit(3)
+            ->take(3)
             ->get();
-            
-        // Get assigned reports (for technicians)
-        $assignedReports = collect();
-        if ($user->isTechnician) {
-            $assignedReports = $user->assignedReports()
-                ->whereIn('status', ['pending', 'in_progress'])
-                ->latest()
-                ->limit(5)
-                ->get();
-        }
-        
-        // Get system-wide statistics (for admins)
-        $systemStats = null;
-        if ($user->isAdmin) {
-            $systemStats = $this->getSystemStats();
-        }
-        
-        // Get notifications
-        $notifications = $user->notifications()
-            ->where('read_at', null)
-            ->latest()
-            ->limit(10)
-            ->get();
-            
-        // Get upcoming events
-        $upcomingEvents = $this->getUpcomingEvents($user);
-        
-        // Get performance metrics
-        $performanceMetrics = $this->getPerformanceMetrics($user);
-        
+
+        // Get AI insights
+        $ai_insights = $user->getAiInsights();
+
+        // Quick actions
+        $quick_actions = [
+            [
+                'title' => 'Krijo Raport',
+                'description' => 'Regjistro problem të ri',
+                'route' => route('reports.create'),
+                'color' => 'red'
+            ],
+            [
+                'title' => 'Shto Automjet',
+                'description' => 'Regjistro automjet të ri',
+                'route' => route('vehicles.create'),
+                'color' => 'blue'
+            ],
+            [
+                'title' => 'AI Chat',
+                'description' => 'Bisedo me AI',
+                'route' => route('ai.chat'),
+                'color' => 'purple'
+            ],
+            [
+                'title' => 'Analitika',
+                'description' => 'Shiko statistikat',
+                'route' => route('ai.analytics'),
+                'color' => 'green'
+            ]
+        ];
+
+        // Upcoming events
+        $upcoming_events = $user->vehicles()
+            ->whereNotNull('next_service_date')
+            ->where('next_service_date', '<=', now()->addDays(30))
+            ->get()
+            ->map(function ($vehicle) {
+                return [
+                    'title' => 'Servis: ' . $vehicle->brand . ' ' . $vehicle->model,
+                    'description' => 'Servis i planifikuar',
+                    'date' => $vehicle->next_service_date,
+                    'type' => 'service',
+                    'priority' => $vehicle->next_service_date <= now() ? 'high' : 'medium'
+                ];
+            })
+            ->take(5);
+
+        // Performance metrics
+        $performance_metrics = [
+            'reports_resolved_this_month' => $user->reports()
+                ->where('status', 'completed')
+                ->whereMonth('updated_at', now()->month)
+                ->count(),
+            'avg_resolution_time' => $user->reports()
+                ->where('status', 'completed')
+                ->whereNotNull('completed_at')
+                ->get()
+                ->avg(function ($report) {
+                    return $report->created_at->diffInHours($report->completed_at);
+                }) ?? 0,
+            'ai_interactions' => $user->aiChats()
+                ->whereMonth('created_at', now()->month)
+                ->count()
+        ];
+
         return Inertia::render('Dashboard', [
             'user' => [
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
-                'avatar' => $user->avatar_url,
-                'role' => $user->role_display_name,
-                'is_technician' => $user->is_technician,
-                'is_admin' => $user->is_admin,
-                'last_login' => $user->last_login_at?->diffForHumans(),
-                'unread_notifications' => $user->getUnreadNotificationsCount()
+                'role' => $user->role ?? 'User',
+                'last_login' => $user->last_login_at ? $user->last_login_at->diffForHumans() : 'Never',
+                'unread_notifications' => 0 // Will be implemented later
             ],
-            'stats' => [
-                'user' => $userStats,
-                'assigned' => $assignedStats,
-                'system' => $systemStats
-            ],
-            'ai_insights' => $aiInsights,
-            'recent_reports' => $recentReports,
-            'urgent_reports' => $urgentReports,
-            'vehicles_needing_service' => $vehiclesNeedingService,
-            'assigned_reports' => $assignedReports,
-            'notifications' => $notifications,
-            'upcoming_events' => $upcomingEvents,
-            'performance_metrics' => $performanceMetrics,
-            'quick_actions' => $this->getQuickActions($user)
+            'stats' => $stats,
+            'recent_reports' => $recent_reports,
+            'urgent_reports' => $urgent_reports,
+            'vehicles_needing_service' => $vehicles_needing_service,
+            'ai_insights' => $ai_insights,
+            'quick_actions' => $quick_actions,
+            'upcoming_events' => $upcoming_events,
+            'performance_metrics' => $performance_metrics,
+            'notifications' => [], // Will be implemented later
         ]);
-    }
-
-    /**
-     * Get system-wide statistics
-     */
-    private function getSystemStats(): array
-    {
-        return [
-            'total_users' => User::count(),
-            'total_reports' => Report::count(),
-            'total_vehicles' => Vehicle::count(),
-            'reports_by_status' => [
-                'pending' => Report::where('status', 'pending')->count(),
-                'in_progress' => Report::where('status', 'in_progress')->count(),
-                'completed' => Report::where('status', 'completed')->count(),
-                'cancelled' => Report::where('status', 'cancelled')->count()
-            ],
-            'reports_by_severity' => [
-                'low' => Report::where('severity_level', 'low')->count(),
-                'medium' => Report::where('severity_level', 'medium')->count(),
-                'high' => Report::where('severity_level', 'high')->count(),
-                'critical' => Report::where('severity_level', 'critical')->count()
-            ],
-            'urgent_reports' => Report::where('is_urgent', true)->count(),
-            'vehicles_needing_service' => Vehicle::needsService()->count(),
-            'average_resolution_time' => $this->calculateAverageResolutionTime(),
-            'total_cost_this_month' => Report::whereMonth('created_at', now()->month)
-                ->sum('estimated_cost')
-        ];
-    }
-
-    /**
-     * Get upcoming events for user
-     */
-    private function getUpcomingEvents(User $user): array
-    {
-        $events = [];
-        
-        // Service appointments
-        $vehiclesNeedingService = $user->vehicles()
-            ->where('next_service_date', '<=', now()->addDays(30))
-            ->get();
-            
-        foreach ($vehiclesNeedingService as $vehicle) {
-            $events[] = [
-                'type' => 'service',
-                'title' => "Servis për {$vehicle->full_name}",
-                'date' => $vehicle->next_service_date,
-                'description' => "Servisi i planifikuar për {$vehicle->full_name}",
-                'priority' => $vehicle->next_service_date->isPast() ? 'high' : 'medium'
-            ];
-        }
-        
-        // Warranty expirations
-        $vehiclesWithExpiringWarranty = $user->vehicles()
-            ->where('warranty_expiry', '<=', now()->addDays(90))
-            ->get();
-            
-        foreach ($vehiclesWithExpiringWarranty as $vehicle) {
-            $events[] = [
-                'type' => 'warranty',
-                'title' => "Garancia po skadon për {$vehicle->full_name}",
-                'date' => $vehicle->warranty_expiry,
-                'description' => "Garancia do të skadojë më {$vehicle->warranty_expiry->format('d/m/Y')}",
-                'priority' => $vehicle->warranty_expiry->isPast() ? 'high' : 'medium'
-            ];
-        }
-        
-        // Insurance expirations
-        $vehiclesWithExpiringInsurance = $user->vehicles()
-            ->where('insurance_expiry', '<=', now()->addDays(30))
-            ->get();
-            
-        foreach ($vehiclesWithExpiringInsurance as $vehicle) {
-            $events[] = [
-                'type' => 'insurance',
-                'title' => "Sigurimi po skadon për {$vehicle->full_name}",
-                'date' => $vehicle->insurance_expiry,
-                'description' => "Sigurimi do të skadojë më {$vehicle->insurance_expiry->format('d/m/Y')}",
-                'priority' => $vehicle->insurance_expiry->isPast() ? 'high' : 'medium'
-            ];
-        }
-        
-        // Sort by date
-        usort($events, function ($a, $b) {
-            return $a['date']->compare($b['date']);
-        });
-        
-        return array_slice($events, 0, 10);
-    }
-
-    /**
-     * Get performance metrics for user
-     */
-    private function getPerformanceMetrics(User $user): array
-    {
-        $reports = $user->reports();
-        $completedReports = $reports->where('status', 'completed');
-        
-        $totalReports = $reports->count();
-        $completedCount = $completedReports->count();
-        
-        return [
-            'completion_rate' => $totalReports > 0 ? round(($completedCount / $totalReports) * 100, 1) : 0,
-            'average_resolution_time' => $this->calculateUserAverageResolutionTime($user),
-            'total_cost_saved' => $completedReports->sum('estimated_cost'),
-            'efficiency_score' => $this->calculateEfficiencyScore($user),
-            'customer_satisfaction' => $this->calculateCustomerSatisfaction($user),
-            'response_time' => $this->calculateAverageResponseTime($user)
-        ];
-    }
-
-    /**
-     * Get quick actions for user
-     */
-    private function getQuickActions(User $user): array
-    {
-        $actions = [
-            [
-                'title' => 'Krijo Raport të Ri',
-                'description' => 'Raporto një problem të automjetit',
-                'icon' => 'plus-circle',
-                'route' => route('reports.create'),
-                'color' => 'blue'
-            ],
-            [
-                'title' => 'Shto Automjet',
-                'description' => 'Regjistro një automjet të ri',
-                'icon' => 'truck',
-                'route' => route('vehicles.create'),
-                'color' => 'green'
-            ],
-            [
-                'title' => 'AI Asistent',
-                'description' => 'Bisedo me AI për ndihmë',
-                'icon' => 'chat-bubble-left-right',
-                'route' => route('ai.chat'),
-                'color' => 'purple'
-            ]
-        ];
-        
-        if ($user->isTechnician) {
-            $actions[] = [
-                'title' => 'Raportet e Caktuara',
-                'description' => 'Shiko raportet që të janë caktuar',
-                'icon' => 'clipboard-document-list',
-                'route' => route('reports.index', ['assigned' => 'true']),
-                'color' => 'orange'
-            ];
-        }
-        
-        if ($user->isAdmin) {
-            $actions[] = [
-                'title' => 'Analitikat AI',
-                'description' => 'Shiko analitikat e sistemit',
-                'icon' => 'chart-bar',
-                'route' => route('ai.analytics'),
-                'color' => 'indigo'
-            ];
-        }
-        
-        return $actions;
-    }
-
-    /**
-     * Calculate average resolution time for system
-     */
-    private function calculateAverageResolutionTime(): float
-    {
-        $completedReports = Report::where('status', 'completed')
-            ->whereNotNull('completed_at');
-            
-        if ($completedReports->count() === 0) {
-            return 0;
-        }
-        
-        $totalHours = $completedReports->get()->sum(function ($report) {
-            return $report->created_at->diffInHours($report->completed_at);
-        });
-        
-        return round($totalHours / $completedReports->count(), 1);
-    }
-
-    /**
-     * Calculate user average resolution time
-     */
-    private function calculateUserAverageResolutionTime(User $user): float
-    {
-        $completedReports = $user->reports()
-            ->where('status', 'completed')
-            ->whereNotNull('completed_at');
-            
-        if ($completedReports->count() === 0) {
-            return 0;
-        }
-        
-        $totalHours = $completedReports->get()->sum(function ($report) {
-            return $report->created_at->diffInHours($report->completed_at);
-        });
-        
-        return round($totalHours / $completedReports->count(), 1);
-    }
-
-    /**
-     * Calculate efficiency score for user
-     */
-    private function calculateEfficiencyScore(User $user): int
-    {
-        $reports = $user->reports();
-        $totalReports = $reports->count();
-        
-        if ($totalReports === 0) {
-            return 100; // Perfect score for new users
-        }
-        
-        $completedReports = $reports->where('status', 'completed')->count();
-        $urgentReports = $reports->where('is_urgent', true)->count();
-        
-        // Base score from completion rate
-        $score = ($completedReports / $totalReports) * 60;
-        
-        // Bonus for handling urgent reports
-        if ($urgentReports > 0) {
-            $score += min(20, $urgentReports * 5);
-        }
-        
-        // Bonus for fast resolution
-        $avgResolutionTime = $this->calculateUserAverageResolutionTime($user);
-        if ($avgResolutionTime < 24) {
-            $score += 20;
-        } elseif ($avgResolutionTime < 48) {
-            $score += 10;
-        }
-        
-        return min(100, round($score));
-    }
-
-    /**
-     * Calculate customer satisfaction (placeholder)
-     */
-    private function calculateCustomerSatisfaction(User $user): float
-    {
-        // This would typically come from customer feedback
-        // For now, return a placeholder value
-        return 4.2;
-    }
-
-    /**
-     * Calculate average response time
-     */
-    private function calculateAverageResponseTime(User $user): float
-    {
-        // This would typically measure time from report creation to first response
-        // For now, return a placeholder value
-        return 2.5;
     }
 }

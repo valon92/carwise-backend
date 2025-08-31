@@ -2,216 +2,363 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
-use Spatie\Activitylog\LogOptions;
-use Spatie\Activitylog\Traits\LogsActivity;
 
 class Report extends Model implements HasMedia
 {
-    use HasFactory, InteractsWithMedia, LogsActivity;
+    use HasFactory, InteractsWithMedia;
 
     protected $fillable = [
-        'user_id',
         'title',
-        'description', 
-        'brand', 
-        'model', 
-        'year', 
-        'vin',
-        'license_plate',
-        'mileage',
-        'fuel_type',
-        'transmission',
-        'color',
-        'problem_category',
-        'severity_level',
+        'description',
+        'vehicle_id',
+        'user_id',
         'status',
-        'ai_analysis',
-        'estimated_cost',
         'priority',
+        'severity_level',
+        'estimated_cost',
+        'estimated_repair_time',
+        'actual_cost',
         'location',
-        'latitude',
-        'longitude',
-        'is_urgent',
-        'assigned_to',
-        'completed_at'
+        'symptoms',
+        'diagnosis',
+        'recommended_actions',
+        'parts_needed',
+        'notes',
+        'completed_at',
+        'completion_notes',
+        'ai_analysis',
+        'ai_recommendations',
+        'ai_confidence_score',
     ];
 
     protected $casts = [
-        'images' => 'array',
-        'ai_analysis' => 'array',
         'estimated_cost' => 'decimal:2',
-        'is_urgent' => 'boolean',
+        'actual_cost' => 'decimal:2',
+        'estimated_repair_time' => 'integer',
         'completed_at' => 'datetime',
-        'latitude' => 'decimal:8',
-        'longitude' => 'decimal:8'
+        'ai_analysis' => 'array',
+        'ai_recommendations' => 'array',
+        'ai_confidence_score' => 'decimal:2',
     ];
 
     protected $dates = [
-        'created_at',
-        'updated_at',
-        'completed_at'
+        'completed_at',
     ];
 
-    // Activity Log
-    public function getActivitylogOptions(): LogOptions
-    {
-        return LogOptions::defaults()
-            ->logOnly(['title', 'status', 'severity_level', 'assigned_to'])
-            ->logOnlyDirty()
-            ->dontSubmitEmptyLogs();
-    }
+    // Status constants
+    const STATUS_PENDING = 'pending';
+    const STATUS_IN_PROGRESS = 'in_progress';
+    const STATUS_COMPLETED = 'completed';
+    const STATUS_CANCELLED = 'cancelled';
 
-    // Relationships
-    public function user()
+    // Priority constants
+    const PRIORITY_LOW = 'low';
+    const PRIORITY_MEDIUM = 'medium';
+    const PRIORITY_HIGH = 'high';
+    const PRIORITY_CRITICAL = 'critical';
+
+    // Severity constants
+    const SEVERITY_MINOR = 'minor';
+    const SEVERITY_MODERATE = 'moderate';
+    const SEVERITY_MAJOR = 'major';
+    const SEVERITY_CRITICAL = 'critical';
+
+    /**
+     * Get the user that owns the report.
+     */
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    public function assignedTechnician()
+    /**
+     * Get the vehicle that the report belongs to.
+     */
+    public function vehicle(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'assigned_to');
+        return $this->belongsTo(Vehicle::class);
     }
 
-    public function comments()
+    /**
+     * Get the assigned technician for this report.
+     */
+    public function assignedTechnician(): BelongsTo
     {
-        return $this->hasMany(ReportComment::class);
+        return $this->belongsTo(User::class, 'assigned_technician_id');
     }
 
-    public function attachments()
+    /**
+     * Get the AI chats related to this report.
+     */
+    public function aiChats(): HasMany
     {
-        return $this->hasMany(ReportAttachment::class);
+        return $this->hasMany(AiChat::class);
     }
 
-    public function notifications()
+    /**
+     * Check if the report is urgent.
+     */
+    public function isUrgent(): bool
     {
-        return $this->hasMany(Notification::class);
+        return in_array($this->priority, [self::PRIORITY_HIGH, self::PRIORITY_CRITICAL]);
     }
 
-    // Scopes
+    /**
+     * Check if the report is completed.
+     */
+    public function isCompleted(): bool
+    {
+        return $this->status === self::STATUS_COMPLETED;
+    }
+
+    /**
+     * Check if the report is in progress.
+     */
+    public function isInProgress(): bool
+    {
+        return $this->status === self::STATUS_IN_PROGRESS;
+    }
+
+    /**
+     * Check if the report is pending.
+     */
+    public function isPending(): bool
+    {
+        return $this->status === self::STATUS_PENDING;
+    }
+
+    /**
+     * Get the status badge color.
+     */
+    public function getStatusColorAttribute(): string
+    {
+        return match($this->status) {
+            self::STATUS_PENDING => 'yellow',
+            self::STATUS_IN_PROGRESS => 'blue',
+            self::STATUS_COMPLETED => 'green',
+            self::STATUS_CANCELLED => 'red',
+            default => 'gray'
+        };
+    }
+
+    /**
+     * Get the priority badge color.
+     */
+    public function getPriorityColorAttribute(): string
+    {
+        return match($this->priority) {
+            self::PRIORITY_LOW => 'green',
+            self::PRIORITY_MEDIUM => 'yellow',
+            self::PRIORITY_HIGH => 'orange',
+            self::PRIORITY_CRITICAL => 'red',
+            default => 'gray'
+        };
+    }
+
+    /**
+     * Get the severity badge color.
+     */
+    public function getSeverityColorAttribute(): string
+    {
+        return match($this->severity_level) {
+            self::SEVERITY_MINOR => 'green',
+            self::SEVERITY_MODERATE => 'yellow',
+            self::SEVERITY_MAJOR => 'orange',
+            self::SEVERITY_CRITICAL => 'red',
+            default => 'gray'
+        };
+    }
+
+    /**
+     * Get the formatted estimated cost.
+     */
+    public function getFormattedEstimatedCostAttribute(): string
+    {
+        return $this->estimated_cost ? '€' . number_format($this->estimated_cost, 2) : 'N/A';
+    }
+
+    /**
+     * Get the formatted actual cost.
+     */
+    public function getFormattedActualCostAttribute(): string
+    {
+        return $this->actual_cost ? '€' . number_format($this->actual_cost, 2) : 'N/A';
+    }
+
+    /**
+     * Get the formatted estimated repair time.
+     */
+    public function getFormattedEstimatedRepairTimeAttribute(): string
+    {
+        if (!$this->estimated_repair_time) {
+            return 'N/A';
+        }
+
+        if ($this->estimated_repair_time < 24) {
+            return $this->estimated_repair_time . ' orë';
+        }
+
+        $days = floor($this->estimated_repair_time / 24);
+        $hours = $this->estimated_repair_time % 24;
+
+        if ($hours === 0) {
+            return $days . ' ditë';
+        }
+
+        return $days . ' ditë, ' . $hours . ' orë';
+    }
+
+    /**
+     * Get the resolution time in hours.
+     */
+    public function getResolutionTimeHoursAttribute(): ?int
+    {
+        if (!$this->completed_at) {
+            return null;
+        }
+
+        return $this->created_at->diffInHours($this->completed_at);
+    }
+
+    /**
+     * Get the formatted resolution time.
+     */
+    public function getFormattedResolutionTimeAttribute(): string
+    {
+        $hours = $this->resolution_time_hours;
+
+        if (!$hours) {
+            return 'N/A';
+        }
+
+        if ($hours < 24) {
+            return $hours . ' orë';
+        }
+
+        $days = floor($hours / 24);
+        $remainingHours = $hours % 24;
+
+        if ($remainingHours === 0) {
+            return $days . ' ditë';
+        }
+
+        return $days . ' ditë, ' . $remainingHours . ' orë';
+    }
+
+    /**
+     * Scope for urgent reports.
+     */
     public function scopeUrgent($query)
     {
-        return $query->where('is_urgent', true);
+        return $query->whereIn('priority', [self::PRIORITY_HIGH, self::PRIORITY_CRITICAL]);
     }
 
-    public function scopeByStatus($query, $status)
+    /**
+     * Scope for completed reports.
+     */
+    public function scopeCompleted($query)
     {
-        return $query->where('status', $status);
+        return $query->where('status', self::STATUS_COMPLETED);
     }
 
+    /**
+     * Scope for pending reports.
+     */
+    public function scopePending($query)
+    {
+        return $query->where('status', self::STATUS_PENDING);
+    }
+
+    /**
+     * Scope for in progress reports.
+     */
+    public function scopeInProgress($query)
+    {
+        return $query->where('status', self::STATUS_IN_PROGRESS);
+    }
+
+    /**
+     * Scope for reports by priority.
+     */
+    public function scopeByPriority($query, $priority)
+    {
+        return $query->where('priority', $priority);
+    }
+
+    /**
+     * Scope for reports by severity.
+     */
     public function scopeBySeverity($query, $severity)
     {
         return $query->where('severity_level', $severity);
     }
 
-    public function scopeByBrand($query, $brand)
+    /**
+     * Scope for reports created in the last X days.
+     */
+    public function scopeRecent($query, $days = 30)
     {
-        return $query->where('brand', $brand);
+        return $query->where('created_at', '>=', now()->subDays($days));
     }
 
-    public function scopeByYear($query, $year)
+    /**
+     * Get AI recommendations for this report.
+     */
+    public function getAiRecommendations(): array
     {
-        return $query->where('year', $year);
+        if ($this->ai_recommendations) {
+            return $this->ai_recommendations;
+        }
+
+        // Generate basic recommendations based on report data
+        $recommendations = [];
+
+        if ($this->severity_level === self::SEVERITY_CRITICAL) {
+            $recommendations[] = [
+                'type' => 'urgent',
+                'title' => 'Kërkohet vëmendje e menjëhershme',
+                'description' => 'Ky problem është kritik dhe kërkon riparim të menjëhershëm.',
+                'priority' => 'high'
+            ];
+        }
+
+        if ($this->estimated_cost && $this->estimated_cost > 1000) {
+            $recommendations[] = [
+                'type' => 'cost',
+                'title' => 'Kosto e lartë e riparimit',
+                'description' => 'Konsideroni të merrni disa oferta para se të vazhdoni.',
+                'priority' => 'medium'
+            ];
+        }
+
+        if ($this->vehicle && $this->vehicle->mileage > 200000) {
+            $recommendations[] = [
+                'type' => 'maintenance',
+                'title' => 'Mirëmbajtje e rregullt',
+                'description' => 'Automjeti ka kilometrazh të lartë, rekomandohet mirëmbajtje e rregullt.',
+                'priority' => 'medium'
+            ];
+        }
+
+        return $recommendations;
     }
 
-    // Accessors
-    public function getFullVehicleNameAttribute()
+    /**
+     * Register media collections for this model.
+     */
+    public function registerMediaCollections(): void
     {
-        return "{$this->brand} {$this->model} ({$this->year})";
-    }
+        $this->addMediaCollection('images')
+            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
+            ->withResponsiveImages();
 
-    public function getStatusColorAttribute()
-    {
-        return match($this->status) {
-            'pending' => 'yellow',
-            'in_progress' => 'blue',
-            'completed' => 'green',
-            'cancelled' => 'red',
-            default => 'gray'
-        };
-    }
-
-    public function getSeverityColorAttribute()
-    {
-        return match($this->severity_level) {
-            'low' => 'green',
-            'medium' => 'yellow',
-            'high' => 'orange',
-            'critical' => 'red',
-            default => 'gray'
-        };
-    }
-
-    // Methods
-    public function markAsUrgent()
-    {
-        $this->update(['is_urgent' => true]);
-    }
-
-    public function assignTo($userId)
-    {
-        $this->update(['assigned_to' => $userId]);
-    }
-
-    public function complete()
-    {
-        $this->update([
-            'status' => 'completed',
-            'completed_at' => now()
-        ]);
-    }
-
-    public function getAiRecommendations()
-    {
-        // AI logic for recommendations
-        return [
-            'estimated_repair_time' => $this->calculateEstimatedRepairTime(),
-            'recommended_parts' => $this->getRecommendedParts(),
-            'cost_breakdown' => $this->getCostBreakdown(),
-            'similar_cases' => $this->findSimilarCases()
-        ];
-    }
-
-    private function calculateEstimatedRepairTime()
-    {
-        // AI-based repair time estimation
-        $baseTime = 2; // hours
-        $severityMultiplier = match($this->severity_level) {
-            'low' => 1,
-            'medium' => 1.5,
-            'high' => 2,
-            'critical' => 3,
-            default => 1
-        };
-        
-        return $baseTime * $severityMultiplier;
-    }
-
-    private function getRecommendedParts()
-    {
-        // AI logic for parts recommendation
-        return [];
-    }
-
-    private function getCostBreakdown()
-    {
-        // AI logic for cost breakdown
-        return [
-            'parts' => $this->estimated_cost * 0.6,
-            'labor' => $this->estimated_cost * 0.4
-        ];
-    }
-
-    private function findSimilarCases()
-    {
-        // AI logic for finding similar cases
-        return self::where('brand', $this->brand)
-            ->where('problem_category', $this->problem_category)
-            ->where('id', '!=', $this->id)
-            ->limit(5)
-            ->get();
+        $this->addMediaCollection('documents')
+            ->acceptsMimeTypes(['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']);
     }
 }

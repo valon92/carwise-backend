@@ -15,72 +15,55 @@ class VehicleController extends Controller
         $this->middleware('auth');
     }
 
-    /**
-     * Display a listing of vehicles
-     */
     public function index(): Response
     {
-        $vehicles = Auth::user()->vehicles()->with('reports')->get();
+        $user = Auth::user();
+        $vehicles = $user->vehicles()->with('reports')->get();
+        
+        $stats = [
+            'total' => $vehicles->count(),
+            'active' => $vehicles->where('status', 'active')->count(),
+            'primary' => $vehicles->where('is_primary', true)->count(),
+        ];
 
         return Inertia::render('Vehicles/Index', [
             'vehicles' => $vehicles,
-            'stats' => [
-                'total' => $vehicles->count(),
-                'active' => $vehicles->where('is_active', true)->count(),
-                'primary' => $vehicles->where('is_primary', true)->count(),
-            ]
+            'stats' => $stats
         ]);
     }
 
-    /**
-     * Show the form for creating a new vehicle
-     */
     public function create(): Response
     {
         return Inertia::render('Vehicles/Create');
     }
 
-    /**
-     * Store a newly created vehicle
-     */
     public function store(Request $request)
     {
+        $user = Auth::user();
+        
         $validated = $request->validate([
-            'brand' => 'required|string|max:100',
-            'model' => 'required|string|max:100',
+            'brand' => 'required|string|max:255',
+            'model' => 'required|string|max:255',
             'year' => 'required|integer|min:1900|max:' . (date('Y') + 1),
+            'license_plate' => 'required|string|max:20|unique:vehicles,license_plate',
             'vin' => 'nullable|string|max:17|unique:vehicles,vin',
-            'license_plate' => 'nullable|string|max:20',
-            'mileage' => 'nullable|integer|min:0',
-            'fuel_type' => 'nullable|string|max:50',
-            'transmission' => 'nullable|string|max:50',
-            'color' => 'nullable|string|max:50',
-            'engine_size' => 'nullable|string|max:50',
-            'horsepower' => 'nullable|integer|min:0',
-            'torque' => 'nullable|integer|min:0',
-            'fuel_efficiency' => 'nullable|numeric|min:0',
-            'body_type' => 'nullable|string|max:50',
-            'doors' => 'nullable|integer|min:1|max:10',
-            'seats' => 'nullable|integer|min:1|max:20',
-            'weight' => 'nullable|numeric|min:0',
-            'length' => 'nullable|numeric|min:0',
-            'width' => 'nullable|numeric|min:0',
-            'height' => 'nullable|numeric|min:0',
-            'warranty_expiry' => 'nullable|date',
+            'color' => 'required|string|max:50',
+            'fuel_type' => 'required|in:gasoline,diesel,electric,hybrid,lpg',
+            'transmission' => 'required|in:manual,automatic',
+            'engine_size' => 'nullable|string|max:20',
+            'mileage' => 'required|integer|min:0',
+            'purchase_date' => 'nullable|date',
+            'purchase_price' => 'nullable|numeric|min:0',
             'insurance_expiry' => 'nullable|date',
-            'last_service_date' => 'nullable|date',
+            'warranty_expiry' => 'nullable|date',
             'next_service_date' => 'nullable|date',
-            'service_history' => 'nullable|array',
-            'modifications' => 'nullable|array',
-            'notes' => 'nullable|string',
-            'is_active' => 'boolean',
-            'is_primary' => 'boolean',
+            'notes' => 'nullable|string|max:1000',
         ]);
 
-        $validated['user_id'] = Auth::id();
-
-        // If this is the first vehicle, make it primary
-        if (Auth::user()->vehicles()->count() === 0) {
+        $validated['user_id'] = $user->id;
+        
+        // Set as primary if it's the first vehicle
+        if ($user->vehicles()->count() === 0) {
             $validated['is_primary'] = true;
         }
 
@@ -90,72 +73,62 @@ class VehicleController extends Controller
             ->with('success', 'Automjeti u shtua me sukses!');
     }
 
-    /**
-     * Display the specified vehicle
-     */
     public function show(Vehicle $vehicle): Response
     {
-        $this->authorize('view', $vehicle);
+        $user = Auth::user();
+        
+        // Check if user owns this vehicle
+        if ($vehicle->user_id !== $user->id) {
+            abort(403, 'Nuk keni leje për të parë këtë automjet.');
+        }
 
         $vehicle->load(['reports']);
 
         return Inertia::render('Vehicles/Show', [
-            'vehicle' => $vehicle,
-            'reports' => $vehicle->reports()->latest()->paginate(10),
-            'serviceHistory' => $vehicle->getServiceHistory(),
-            'modifications' => $vehicle->getModifications(),
+            'vehicle' => $vehicle
         ]);
     }
 
-    /**
-     * Show the form for editing the specified vehicle
-     */
     public function edit(Vehicle $vehicle): Response
     {
-        $this->authorize('update', $vehicle);
+        $user = Auth::user();
+        
+        // Check if user owns this vehicle
+        if ($vehicle->user_id !== $user->id) {
+            abort(403, 'Nuk keni leje për të edituar këtë automjet.');
+        }
 
         return Inertia::render('Vehicles/Edit', [
             'vehicle' => $vehicle
         ]);
     }
 
-    /**
-     * Update the specified vehicle
-     */
     public function update(Request $request, Vehicle $vehicle)
     {
-        $this->authorize('update', $vehicle);
+        $user = Auth::user();
+        
+        // Check if user owns this vehicle
+        if ($vehicle->user_id !== $user->id) {
+            abort(403, 'Nuk keni leje për të përditësuar këtë automjet.');
+        }
 
         $validated = $request->validate([
-            'brand' => 'required|string|max:100',
-            'model' => 'required|string|max:100',
+            'brand' => 'required|string|max:255',
+            'model' => 'required|string|max:255',
             'year' => 'required|integer|min:1900|max:' . (date('Y') + 1),
+            'license_plate' => 'required|string|max:20|unique:vehicles,license_plate,' . $vehicle->id,
             'vin' => 'nullable|string|max:17|unique:vehicles,vin,' . $vehicle->id,
-            'license_plate' => 'nullable|string|max:20',
-            'mileage' => 'nullable|integer|min:0',
-            'fuel_type' => 'nullable|string|max:50',
-            'transmission' => 'nullable|string|max:50',
-            'color' => 'nullable|string|max:50',
-            'engine_size' => 'nullable|string|max:50',
-            'horsepower' => 'nullable|integer|min:0',
-            'torque' => 'nullable|integer|min:0',
-            'fuel_efficiency' => 'nullable|numeric|min:0',
-            'body_type' => 'nullable|string|max:50',
-            'doors' => 'nullable|integer|min:1|max:10',
-            'seats' => 'nullable|integer|min:1|max:20',
-            'weight' => 'nullable|numeric|min:0',
-            'length' => 'nullable|numeric|min:0',
-            'width' => 'nullable|numeric|min:0',
-            'height' => 'nullable|numeric|min:0',
-            'warranty_expiry' => 'nullable|date',
+            'color' => 'required|string|max:50',
+            'fuel_type' => 'required|in:gasoline,diesel,electric,hybrid,lpg',
+            'transmission' => 'required|in:manual,automatic',
+            'engine_size' => 'nullable|string|max:20',
+            'mileage' => 'required|integer|min:0',
+            'purchase_date' => 'nullable|date',
+            'purchase_price' => 'nullable|numeric|min:0',
             'insurance_expiry' => 'nullable|date',
-            'last_service_date' => 'nullable|date',
+            'warranty_expiry' => 'nullable|date',
             'next_service_date' => 'nullable|date',
-            'service_history' => 'nullable|array',
-            'modifications' => 'nullable|array',
-            'notes' => 'nullable|string',
-            'is_active' => 'boolean',
-            'is_primary' => 'boolean',
+            'notes' => 'nullable|string|max:1000',
         ]);
 
         $vehicle->update($validated);
@@ -164,12 +137,14 @@ class VehicleController extends Controller
             ->with('success', 'Automjeti u përditësua me sukses!');
     }
 
-    /**
-     * Remove the specified vehicle
-     */
     public function destroy(Vehicle $vehicle)
     {
-        $this->authorize('delete', $vehicle);
+        $user = Auth::user();
+        
+        // Check if user owns this vehicle
+        if ($vehicle->user_id !== $user->id) {
+            abort(403, 'Nuk keni leje për të fshirë këtë automjet.');
+        }
 
         $vehicle->delete();
 
@@ -177,47 +152,51 @@ class VehicleController extends Controller
             ->with('success', 'Automjeti u fshi me sukses!');
     }
 
-    /**
-     * Mark vehicle as primary
-     */
     public function markPrimary(Vehicle $vehicle)
     {
-        $this->authorize('update', $vehicle);
+        $user = Auth::user();
+        
+        // Check if user owns this vehicle
+        if ($vehicle->user_id !== $user->id) {
+            abort(403, 'Nuk keni leje për të ndryshuar këtë automjet.');
+        }
 
-        // Remove primary from other vehicles
-        Auth::user()->vehicles()->update(['is_primary' => false]);
-
+        // Remove primary from all other vehicles
+        $user->vehicles()->update(['is_primary' => false]);
+        
         // Set this vehicle as primary
         $vehicle->update(['is_primary' => true]);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Automjeti u bë kryesor!'
-        ]);
+        return response()->json(['success' => true]);
     }
 
-    /**
-     * Add service record
-     */
     public function addServiceRecord(Request $request, Vehicle $vehicle)
     {
-        $this->authorize('update', $vehicle);
+        $user = Auth::user();
+        
+        // Check if user owns this vehicle
+        if ($vehicle->user_id !== $user->id) {
+            abort(403, 'Nuk keni leje për të shtuar regjistër servisi.');
+        }
 
         $validated = $request->validate([
-            'service_type' => 'required|string|max:100',
-            'description' => 'required|string',
-            'cost' => 'nullable|numeric|min:0',
             'service_date' => 'required|date',
-            'next_service_date' => 'nullable|date|after:service_date',
-            'mileage' => 'nullable|integer|min:0',
-            'service_provider' => 'nullable|string|max:100',
+            'service_type' => 'required|string|max:255',
+            'description' => 'required|string|max:1000',
+            'cost' => 'required|numeric|min:0',
+            'next_service_date' => 'nullable|date',
+            'mileage' => 'required|integer|min:0',
         ]);
 
-        $vehicle->addServiceRecord($validated);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Regjistri i servisit u shtua me sukses!'
+        // Update vehicle mileage and next service date
+        $vehicle->update([
+            'mileage' => $validated['mileage'],
+            'next_service_date' => $validated['next_service_date']
         ]);
+
+        // Create service record (you might want to create a separate table for this)
+        // For now, we'll just update the vehicle
+
+        return response()->json(['success' => true]);
     }
 }

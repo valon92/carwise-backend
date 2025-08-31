@@ -101,6 +101,14 @@ class Vehicle extends Model implements HasMedia
         return $query->where('user_id', $userId);
     }
 
+    public function scopeNeedsService($query)
+    {
+        return $query->where(function ($q) {
+            $q->whereNull('next_service_date')
+              ->orWhere('next_service_date', '<=', now());
+        });
+    }
+
     // Accessors
     public function getFullNameAttribute()
     {

@@ -28,13 +28,14 @@ const mobileMenuOpen = ref(false);
                 
                 <!-- Desktop menu -->
                 <div class="hidden md:flex items-center space-x-4">
-                    <Link
-                        v-if="$page.props.auth.user"
-                        :href="route('dashboard')"
-                        class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl"
-                    >
-                        Dashboard
-                    </Link>
+                    <template v-if="$page.props.auth.user">
+                        <Link
+                            :href="route('dashboard')"
+                            class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+                        >
+                            Dashboard
+                        </Link>
+                    </template>
                     <template v-else>
                         <Link
                             :href="route('login')"
@@ -68,14 +69,15 @@ const mobileMenuOpen = ref(false);
         <!-- Mobile menu -->
         <div v-if="mobileMenuOpen" class="md:hidden">
             <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-white/95 backdrop-blur-sm border-t border-gray-200/50">
-                <Link
-                    v-if="$page.props.auth.user"
-                    :href="route('dashboard')"
-                    class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
-                    @click="mobileMenuOpen = false"
-                >
-                    Dashboard
-                </Link>
+                <template v-if="$page.props.auth.user">
+                    <Link
+                        :href="route('dashboard')"
+                        class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
+                        @click="mobileMenuOpen = false"
+                    >
+                        Dashboard
+                    </Link>
+                </template>
                 <template v-else>
                     <Link
                         :href="route('login')"

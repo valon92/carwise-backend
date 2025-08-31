@@ -23,6 +23,8 @@ return new class extends Migration
             $table->string('fuel_type', 50)->nullable();
             $table->string('transmission', 50)->nullable();
             $table->string('color', 50)->nullable();
+            $table->date('purchase_date')->nullable();
+            $table->decimal('purchase_price', 10, 2)->nullable();
             $table->string('engine_size', 50)->nullable();
             $table->integer('horsepower')->nullable();
             $table->integer('torque')->nullable();

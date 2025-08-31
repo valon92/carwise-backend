@@ -11,7 +11,9 @@ import {
     MagnifyingGlassIcon,
     Bars3Icon,
     XMarkIcon,
-    ChevronDownIcon
+    ChevronDownIcon,
+    TruckIcon,
+    DocumentTextIcon
 } from '@heroicons/vue/24/outline';
 
 const page = usePage();
@@ -19,13 +21,15 @@ const showingNavigationDropdown = ref(false);
 const showingMobileMenu = ref(false);
 const showingUserDropdown = ref(false);
 
+// Use authenticated user
 const user = computed(() => page.props.auth.user);
 
 const navigation = [
     { name: 'Dashboard', href: route('dashboard'), icon: HomeIcon, current: route().current('dashboard') },
+    { name: 'Vehicles', href: route('vehicles.index'), icon: TruckIcon, current: route().current('vehicles.*') },
+    { name: 'Reports', href: route('reports.index'), icon: DocumentTextIcon, current: route().current('reports.*') },
     { name: 'AI Chat', href: route('ai.chat'), icon: ChatBubbleLeftRightIcon, current: route().current('ai.chat') },
     { name: 'Analytics', href: route('ai.analytics'), icon: ChartBarIcon, current: route().current('ai.analytics') },
-    { name: 'Reports', href: route('reports.index'), icon: UserGroupIcon, current: route().current('reports.*') },
 ];
 
 const userNavigation = [

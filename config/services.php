@@ -14,6 +14,13 @@ return [
     |
     */
 
+    'mailgun' => [
+        'domain' => env('MAILGUN_DOMAIN'),
+        'secret' => env('MAILGUN_SECRET'),
+        'endpoint' => env('MAILGUN_ENDPOINT', 'api.mailgun.net'),
+        'scheme' => 'https',
+    ],
+
     'postmark' => [
         'token' => env('POSTMARK_TOKEN'),
     ],
@@ -24,14 +31,27 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
-    'resend' => [
-        'key' => env('RESEND_KEY'),
+    'openai' => [
+        'api_key' => env('OPENAI_API_KEY'),
+        'model' => env('OPENAI_MODEL', 'gpt-4'),
+        'max_tokens' => env('OPENAI_MAX_TOKENS', 1000),
+        'temperature' => env('OPENAI_TEMPERATURE', 0.7),
     ],
 
-    'slack' => [
-        'notifications' => [
-            'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
-            'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
+    'pusher' => [
+        'app_id' => env('PUSHER_APP_ID'),
+        'app_key' => env('PUSHER_APP_KEY'),
+        'app_secret' => env('PUSHER_APP_SECRET'),
+        'host' => env('PUSHER_HOST') ?: 'api-'.env('PUSHER_APP_CLUSTER', 'mt1').'.pusherapp.com',
+        'port' => env('PUSHER_PORT', 443),
+        'scheme' => env('PUSHER_SCHEME', 'https'),
+        'app_cluster' => env('PUSHER_APP_CLUSTER', 'mt1'),
+        'options' => [
+            'cluster' => env('PUSHER_APP_CLUSTER'),
+            'useTLS' => env('PUSHER_SCHEME', 'https') === 'https',
+        ],
+        'client_options' => [
+            // Guzzle client options: https://docs.guzzlephp.org/en/stable/request-options.html
         ],
     ],
 

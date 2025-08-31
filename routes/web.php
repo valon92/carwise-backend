@@ -11,8 +11,8 @@ use Inertia\Inertia;
 
 Route::get('/', function () {
     return Inertia::render('Welcome', [
-        'canLogin' => Route::has('login'),
-        'canRegister' => Route::has('register'),
+        'canLogin' => true,
+        'canRegister' => true,
     ]);
 });
 
@@ -60,10 +60,12 @@ Route::middleware('auth')->prefix('vehicles')->name('vehicles.')->group(function
     Route::post('/{vehicle}/service', [VehicleController::class, 'addServiceRecord'])->name('service');
 });
 
+// Profile Routes
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
+// Enable auth routes
 require __DIR__.'/auth.php';

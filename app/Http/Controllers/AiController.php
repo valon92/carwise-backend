@@ -24,238 +24,112 @@ class AiController extends Controller
         $this->middleware('auth');
     }
 
-    /**
-     * Show AI chat interface
-     */
     public function chat(): Response
     {
         $user = Auth::user();
+        
+        // Get user's chat history
         $chatHistory = $user->aiChats()
             ->latest()
-            ->limit(50)
-            ->get()
-            ->reverse();
-
-        $insights = $this->aiService->getUserInsights($user);
+            ->take(50)
+            ->get();
+            
+        // Get AI insights for user
+        $insights = $user->getAiInsights();
+        
+        // Get user's vehicles for context
+        $vehicles = $user->vehicles()->get();
+        
+        // Get user stats
+        $userStats = [
+            'total_reports' => $user->reports()->count(),
+            'total_vehicles' => $vehicles->count(),
+            'ai_interactions' => $chatHistory->count(),
+            'avg_confidence' => $chatHistory->avg('confidence') ?? 0
+        ];
 
         return Inertia::render('Ai/Chat', [
             'chatHistory' => $chatHistory,
             'insights' => $insights,
-            'userStats' => $user->getReportsStats(),
-            'vehicles' => $user->vehicles()->active()->get()
+            'userStats' => $userStats,
+            'vehicles' => $vehicles
         ]);
     }
 
-    /**
-     * Process AI chat message
-     */
-    public function processMessage(Request $request): JsonResponse
+    public function processMessage(Request $request)
     {
-        $validator = Validator::make($request->all(), [
+        $user = Auth::user();
+        
+        $request->validate([
             'message' => 'required|string|max:1000',
-            'session_id' => 'nullable|string|uuid'
+            'session_id' => 'nullable|string'
         ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
-        $user = Auth::user();
         $result = $this->aiService->processMessage(
             $user,
-            $request->input('message'),
-            $request->input('session_id')
+            $request->message,
+            $request->session_id
         );
 
         return response()->json($result);
     }
 
-    /**
-     * Get chat history for a session
-     */
-    public function getChatHistory(Request $request): JsonResponse
+    public function getChatHistory()
     {
-        $validator = Validator::make($request->all(), [
-            'session_id' => 'required|string|uuid'
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
         $user = Auth::user();
+        
         $chatHistory = $user->aiChats()
-            ->where('session_id', $request->input('session_id'))
-            ->orderBy('created_at', 'asc')
+            ->latest()
+            ->take(100)
             ->get();
 
-        return response()->json([
-            'success' => true,
-            'chat_history' => $chatHistory
-        ]);
+        return response()->json($chatHistory);
     }
 
-    /**
-     * Provide feedback for AI response
-     */
-    public function provideFeedback(Request $request): JsonResponse
+    public function provideFeedback(Request $request)
     {
-        $validator = Validator::make($request->all(), [
+        $user = Auth::user();
+        
+        $request->validate([
             'chat_id' => 'required|exists:ai_chats,id',
             'rating' => 'required|integer|between:1,5',
-            'comment' => 'nullable|string|max:500'
+            'feedback' => 'nullable|string|max:500'
         ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors()
-            ], 422);
-        }
+        $chat = $user->aiChats()->findOrFail($request->chat_id);
+        $chat->update([
+            'user_rating' => $request->rating,
+            'user_feedback' => $request->feedback
+        ]);
 
+        return response()->json(['success' => true]);
+    }
+
+    public function getInsights()
+    {
         $user = Auth::user();
-        $chat = $user->aiChats()->findOrFail($request->input('chat_id'));
+        $insights = $user->getAiInsights();
         
-        $chat->addFeedback(
-            $request->input('rating'),
-            $request->input('comment')
-        );
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Feedback u ruajt me sukses!'
-        ]);
+        return response()->json($insights);
     }
 
-    /**
-     * Get AI insights for user
-     */
-    public function getInsights(): JsonResponse
-    {
-        $user = Auth::user();
-        $insights = $this->aiService->getUserInsights($user);
-
-        return response()->json([
-            'success' => true,
-            'insights' => $insights
-        ]);
-    }
-
-    /**
-     * Get AI recommendations for reports
-     */
-    public function getReportRecommendations(Request $request): JsonResponse
-    {
-        $validator = Validator::make($request->all(), [
-            'report_id' => 'required|exists:reports,id'
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
-        $user = Auth::user();
-        $report = $user->reports()->findOrFail($request->input('report_id'));
-        
-        $recommendations = $report->getAiRecommendations();
-
-        return response()->json([
-            'success' => true,
-            'recommendations' => $recommendations
-        ]);
-    }
-
-    /**
-     * Get AI recommendations for vehicles
-     */
-    public function getVehicleRecommendations(Request $request): JsonResponse
-    {
-        $validator = Validator::make($request->all(), [
-            'vehicle_id' => 'required|exists:vehicles,id'
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
-        $user = Auth::user();
-        $vehicle = $user->vehicles()->findOrFail($request->input('vehicle_id'));
-        
-        $recommendations = $vehicle->getAiRecommendations();
-
-        return response()->json([
-            'success' => true,
-            'recommendations' => $recommendations
-        ]);
-    }
-
-    /**
-     * Analyze report with AI
-     */
-    public function analyzeReport(Request $request): JsonResponse
-    {
-        $validator = Validator::make($request->all(), [
-            'report_id' => 'required|exists:reports,id'
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
-        $user = Auth::user();
-        $report = $user->reports()->findOrFail($request->input('report_id'));
-
-        // AI analysis logic
-        $analysis = [
-            'severity_assessment' => $this->assessSeverity($report),
-            'cost_estimation' => $this->estimateCost($report),
-            'repair_time_estimation' => $this->estimateRepairTime($report),
-            'parts_recommendations' => $this->recommendParts($report),
-            'similar_cases' => $this->findSimilarCases($report),
-            'preventive_measures' => $this->suggestPreventiveMeasures($report)
-        ];
-
-        // Update report with AI analysis
-        $report->update(['ai_analysis' => $analysis]);
-
-        return response()->json([
-            'success' => true,
-            'analysis' => $analysis
-        ]);
-    }
-
-    /**
-     * Get AI analytics dashboard
-     */
     public function analytics(): Response
     {
         $user = Auth::user();
         
+        // Check if user can view analytics
         if (!$user->canViewAnalytics()) {
             abort(403, 'Nuk keni leje për të parë analitikat.');
         }
 
-        $analytics = [
-            'user_insights' => $this->aiService->getUserInsights($user),
-            'system_stats' => $this->getSystemStats(),
-            'ai_performance' => $this->getAiPerformanceStats(),
-            'trends' => $this->getTrends()
-        ];
+        // Get system-wide analytics
+        $analytics = $this->getSystemAnalytics();
+        
+        // Get user-specific analytics
+        $userAnalytics = $this->getUserAnalytics($user);
+        
+        // Merge analytics
+        $analytics['user_insights'] = $userAnalytics;
 
         return Inertia::render('Ai/Analytics', [
             'analytics' => $analytics

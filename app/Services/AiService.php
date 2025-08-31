@@ -9,9 +9,18 @@ use App\Models\Vehicle;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 
 class AiService
 {
+    protected $openaiApiKey;
+    protected $openaiEndpoint = 'https://api.openai.com/v1/chat/completions';
+
+    public function __construct()
+    {
+        $this->openaiApiKey = config('services.openai.api_key');
+    }
+
     /**
      * Process user message and generate AI response
      */
@@ -23,12 +32,15 @@ class AiService
             // Generate session ID if not provided
             $sessionId = $sessionId ?? Str::uuid()->toString();
             
+            // Get user context
+            $userContext = $this->getUserContext($user);
+            
             // Analyze intent
             $intent = $this->analyzeIntent($message);
             $confidence = $this->calculateConfidence($message, $intent);
             
             // Generate response based on intent
-            $response = $this->generateResponse($user, $message, $intent, $confidence);
+            $response = $this->generateResponse($user, $message, $intent, $confidence, $userContext);
             
             // Calculate processing time
             $processingTime = microtime(true) - $startTime;
@@ -44,7 +56,7 @@ class AiService
                 'confidence' => $confidence,
                 'processing_time' => $processingTime,
                 'tokens_used' => $this->estimateTokens($message . $response['text']),
-                'model_used' => 'carwise-ai-v1'
+                'model_used' => 'gpt-4'
             ]);
             
             return [
@@ -68,7 +80,202 @@ class AiService
             ];
         }
     }
-    
+
+    /**
+     * Get user context for AI
+     */
+    private function getUserContext(User $user): array
+    {
+        $vehicles = $user->vehicles()->with('reports')->get();
+        $recentReports = $user->reports()->latest()->take(5)->get();
+        
+        return [
+            'user' => [
+                'name' => $user->name,
+                'total_vehicles' => $vehicles->count(),
+                'total_reports' => $user->reports()->count(),
+            ],
+            'vehicles' => $vehicles->map(function ($vehicle) {
+                return [
+                    'id' => $vehicle->id,
+                    'brand' => $vehicle->brand,
+                    'model' => $vehicle->model,
+                    'year' => $vehicle->year,
+                    'mileage' => $vehicle->mileage,
+                    'status' => $vehicle->status,
+                    'reports_count' => $vehicle->reports->count(),
+                ];
+            })->toArray(),
+            'recent_reports' => $recentReports->map(function ($report) {
+                return [
+                    'id' => $report->id,
+                    'title' => $report->title,
+                    'status' => $report->status,
+                    'priority' => $report->priority,
+                    'created_at' => $report->created_at->format('Y-m-d'),
+                ];
+            })->toArray(),
+        ];
+    }
+
+    /**
+     * Generate AI response using OpenAI
+     */
+    private function generateResponse(User $user, string $message, string $intent, float $confidence, array $context): array
+    {
+        if (!$this->openaiApiKey) {
+            return $this->generateFallbackResponse($message, $intent);
+        }
+
+        try {
+            $systemPrompt = $this->buildSystemPrompt($context);
+            $userPrompt = $this->buildUserPrompt($message, $intent);
+
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $this->openaiApiKey,
+                'Content-Type' => 'application/json',
+            ])->post($this->openaiEndpoint, [
+                'model' => 'gpt-4',
+                'messages' => [
+                    ['role' => 'system', 'content' => $systemPrompt],
+                    ['role' => 'user', 'content' => $userPrompt],
+                ],
+                'max_tokens' => 1000,
+                'temperature' => 0.7,
+            ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                $aiResponse = $data['choices'][0]['message']['content'] ?? '';
+                
+                return [
+                    'text' => $aiResponse,
+                    'context' => $context,
+                    'actions' => $this->extractActions($aiResponse),
+                    'follow_up' => $this->generateFollowUpQuestions($intent),
+                ];
+            }
+
+            return $this->generateFallbackResponse($message, $intent);
+
+        } catch (\Exception $e) {
+            Log::error('OpenAI API Error: ' . $e->getMessage());
+            return $this->generateFallbackResponse($message, $intent);
+        }
+    }
+
+    /**
+     * Build system prompt for AI
+     */
+    private function buildSystemPrompt(array $context): string
+    {
+        return "Ti je CarWise AI, një asistent inteligjent për menaxhimin e automjeteve. 
+
+Kontesti i përdoruesit:
+- Emri: {$context['user']['name']}
+- Automjete: {$context['user']['total_vehicles']}
+- Raporte: {$context['user']['total_reports']}
+
+Automjetet e përdoruesit:
+" . json_encode($context['vehicles'], JSON_UNESCAPED_UNICODE) . "
+
+Raportet e fundit:
+" . json_encode($context['recent_reports'], JSON_UNESCAPED_UNICODE) . "
+
+Udhëzimet:
+1. Përgjigju në shqip
+2. Jip rekomandime të përshtatshme bazuar në automjetet e përdoruesit
+3. Sugjero veprime specifike kur është e nevojshme
+4. Përdor informacionin nga konteksti për përgjigje më të personalizuara
+5. Jip këshilla për mirëmbajtjen e automjeteve
+6. Ndihmo me diagnostikimin e problemeve";
+    }
+
+    /**
+     * Build user prompt
+     */
+    private function buildUserPrompt(string $message, string $intent): string
+    {
+        return "Mesazhi i përdoruesit: $message
+
+Intenti i detektuar: $intent
+
+Ju lutem përgjigju në mënyrë të dobishme dhe të personalizuar.";
+    }
+
+    /**
+     * Generate fallback response when AI is not available
+     */
+    private function generateFallbackResponse(string $message, string $intent): array
+    {
+        $responses = [
+            'create_report' => 'Për të krijuar një raport të ri, ju lutem shkoni te faqja "Raporte" dhe klikoni "Krijo Raport". A keni nevojë për ndihmë me detajet e raportit?',
+            'check_status' => 'Për të kontrolluar statusin e raporteve tuaj, mund të shkoni te faqja "Raporte" ku do të shihni të gjitha raportet tuaj dhe statusin e tyre.',
+            'get_help' => 'Si mund t\'ju ndihmoj? Mund t\'ju ndihmoj me raportimin e problemeve, menaxhimin e automjeteve, ose këshilla për mirëmbajtje.',
+            'vehicle_info' => 'Për të parë informacionin e automjeteve tuaj, shkoni te faqja "Automjete" ku do të gjeni të gjitha detajet.',
+            'cost_estimate' => 'Për vlerësimin e kostove, rekomandoj të konsultoni me një mekanik profesional. Mund t\'ju ndihmoj të krijohet një raport i detajuar për vlerësim.',
+            'schedule_service' => 'Për të programuar servis, mund të përdorni faqen "Automjete" dhe të përditësoni datën e servisit të ardhshëm.',
+            'find_parts' => 'Për gjetjen e pjesëve, rekomandoj të kontaktoni një dyqan të specializuar ose të përdorni platforma online të besueshme.',
+            'emergency' => 'Për probleme urgjente, rekomandoj të kontaktoni menjëherë një mekanik profesional ose shërbimin e ndihmës rrugore.',
+            'general_inquiry' => 'Si mund t\'ju ndihmoj me automjetet tuaj? Mund t\'ju ofroj këshilla për mirëmbajtje, ndihmë me raporte, ose informacion për automjetet tuaj.'
+        ];
+
+        return [
+            'text' => $responses[$intent] ?? $responses['general_inquiry'],
+            'context' => [],
+            'actions' => [],
+            'follow_up' => [],
+        ];
+    }
+
+    /**
+     * Extract suggested actions from AI response
+     */
+    private function extractActions(string $response): array
+    {
+        $actions = [];
+        
+        if (str_contains(strtolower($response), 'krijo raport')) {
+            $actions[] = ['text' => 'Krijo Raport', 'route' => 'reports.create'];
+        }
+        
+        if (str_contains(strtolower($response), 'shiko automjete')) {
+            $actions[] = ['text' => 'Shiko Automjete', 'route' => 'vehicles.index'];
+        }
+        
+        if (str_contains(strtolower($response), 'shiko raporte')) {
+            $actions[] = ['text' => 'Shiko Raporte', 'route' => 'reports.index'];
+        }
+        
+        return $actions;
+    }
+
+    /**
+     * Generate follow-up questions based on intent
+     */
+    private function generateFollowUpQuestions(string $intent): array
+    {
+        $questions = [
+            'create_report' => [
+                'Cili automjet ka problemin?',
+                'Çfarë lloj problemi po hasni?',
+                'Kur filloi problemi?'
+            ],
+            'check_status' => [
+                'Cili raport dëshironi të kontrolloni?',
+                'A keni raporte urgjente?',
+                'A dëshironi të shihni raportet e fundit?'
+            ],
+            'vehicle_info' => [
+                'Cili automjet dëshironi të shihni?',
+                'A dëshironi të shtoni automjet të ri?',
+                'A keni nevojë për informacion për mirëmbajtje?'
+            ]
+        ];
+
+        return $questions[$intent] ?? [];
+    }
+
     /**
      * Analyze user intent from message
      */
@@ -98,375 +305,40 @@ class AiService
         
         return 'general_inquiry';
     }
-    
+
     /**
-     * Calculate confidence score for intent
+     * Calculate confidence score
      */
     private function calculateConfidence(string $message, string $intent): float
     {
         $message = strtolower($message);
-        $confidence = 0.5; // Base confidence
-        
-        // Boost confidence based on keyword matches
-        $keywordMatches = 0;
-        $totalKeywords = 0;
-        
         $patterns = [
-            'create_report' => ['raport', 'problem', 'defekt', 'krijo', 'shto'],
-            'check_status' => ['status', 'gjendje', 'progres', 'kontrollo'],
-            'get_help' => ['ndihmë', 'help', 'si', 'ku'],
-            'vehicle_info' => ['makinë', 'automjet', 'informacion'],
-            'cost_estimate' => ['kosto', 'çmim', 'parashikim'],
-            'schedule_service' => ['servis', 'mirëmbajtje', 'programo'],
-            'find_parts' => ['pjesë', 'spare', 'gjej'],
-            'emergency' => ['urgjent', 'emergjencë', 'menjëherë']
+            'create_report' => ['raport', 'problem', 'defekt', 'krijo', 'shto', 'regjistro'],
+            'check_status' => ['status', 'gjendje', 'progres', 'kontrollo', 'shiko'],
+            'get_help' => ['ndihmë', 'help', 'si', 'ku', 'çfarë'],
+            'vehicle_info' => ['makinë', 'automjet', 'informacion', 'detaje'],
+            'cost_estimate' => ['kosto', 'çmim', 'parashikim', 'vlerësim'],
+            'schedule_service' => ['servis', 'mirëmbajtje', 'programo', 'termin'],
+            'find_parts' => ['pjesë', 'spare', 'gjej', 'ku mund'],
+            'emergency' => ['urgjent', 'emergjencë', 'menjëherë', 'tani']
         ];
+
+        if (!isset($patterns[$intent])) {
+            return 0.3;
+        }
+
+        $keywords = $patterns[$intent];
+        $matches = 0;
         
-        if (isset($patterns[$intent])) {
-            $totalKeywords = count($patterns[$intent]);
-            foreach ($patterns[$intent] as $keyword) {
-                if (str_contains($message, $keyword)) {
-                    $keywordMatches++;
-                }
+        foreach ($keywords as $keyword) {
+            if (str_contains($message, $keyword)) {
+                $matches++;
             }
         }
-        
-        if ($totalKeywords > 0) {
-            $confidence += ($keywordMatches / $totalKeywords) * 0.4;
-        }
-        
-        // Boost for longer, more specific messages
-        if (strlen($message) > 20) {
-            $confidence += 0.1;
-        }
-        
-        return min(1.0, $confidence);
+
+        return min(1.0, $matches / count($keywords) + 0.2);
     }
-    
-    /**
-     * Generate AI response based on intent
-     */
-    private function generateResponse(User $user, string $message, string $intent, float $confidence): array
-    {
-        $context = [];
-        
-        switch ($intent) {
-            case 'create_report':
-                return $this->handleCreateReport($user, $message, $context);
-                
-            case 'check_status':
-                return $this->handleCheckStatus($user, $message, $context);
-                
-            case 'get_help':
-                return $this->handleGetHelp($user, $message, $context);
-                
-            case 'vehicle_info':
-                return $this->handleVehicleInfo($user, $message, $context);
-                
-            case 'cost_estimate':
-                return $this->handleCostEstimate($user, $message, $context);
-                
-            case 'schedule_service':
-                return $this->handleScheduleService($user, $message, $context);
-                
-            case 'find_parts':
-                return $this->handleFindParts($user, $message, $context);
-                
-            case 'emergency':
-                return $this->handleEmergency($user, $message, $context);
-                
-            default:
-                return $this->handleGeneralInquiry($user, $message, $context);
-        }
-    }
-    
-    /**
-     * Handle create report intent
-     */
-    private function handleCreateReport(User $user, string $message, array &$context): array
-    {
-        $userStats = $user->getReportsStats();
-        
-        $response = "Mirë! Po ju ndihmoj të krijoni një raport të ri për problemin e automjetit tuaj. ";
-        
-        if ($userStats['total'] > 0) {
-            $response .= "Deri tani keni krijuar {$userStats['total']} raporte. ";
-        }
-        
-        $response .= "Për të filluar, më tregoni:\n\n";
-        $response .= "🚗 **Marka dhe modeli i automjetit**\n";
-        $response .= "📅 **Viti i prodhimit**\n";
-        $response .= "🔧 **Përshkrimi i problemit**\n";
-        $response .= "⚡ **Sa urgjent është?**";
-        
-        $context['intent'] = 'create_report';
-        $context['step'] = 'initial';
-        
-        return [
-            'text' => $response,
-            'context' => $context,
-            'actions' => ['redirect_to_report_form'],
-            'follow_up' => [
-                'Cili është marka dhe modeli i automjetit tuaj?',
-                'Në çfarë viti është prodhuar automjeti?',
-                'Si mund ta përshkruani problemin?'
-            ]
-        ];
-    }
-    
-    /**
-     * Handle check status intent
-     */
-    private function handleCheckStatus(User $user, string $message, array &$context): array
-    {
-        $userStats = $user->getReportsStats();
-        
-        if ($userStats['total'] === 0) {
-            return [
-                'text' => "Ju nuk keni asnjë raport të krijuar ende. Dëshironi të krijoni një raport të ri?",
-                'context' => $context,
-                'actions' => ['redirect_to_report_form']
-            ];
-        }
-        
-        $response = "📊 **Statusi i raporteve tuaja:**\n\n";
-        $response .= "📋 **Total:** {$userStats['total']} raporte\n";
-        $response .= "⏳ **Në pritje:** {$userStats['pending']} raporte\n";
-        $response .= "🔄 **Në progres:** {$userStats['in_progress']} raporte\n";
-        $response .= "✅ **Përfunduar:** {$userStats['completed']} raporte\n";
-        
-        if ($userStats['urgent'] > 0) {
-            $response .= "🚨 **Urgjente:** {$userStats['urgent']} raporte\n";
-        }
-        
-        $response .= "\nDëshironi të shihni detajet e një raporti specifik?";
-        
-        return [
-            'text' => $response,
-            'context' => $context,
-            'actions' => ['show_reports_list', 'show_dashboard'],
-            'follow_up' => [
-                'Cili raport dëshironi të shihni?',
-                'Dëshironi të filtroni sipas statusit?',
-                'A keni ndonjë raport urgjent?'
-            ]
-        ];
-    }
-    
-    /**
-     * Handle get help intent
-     */
-    private function handleGetHelp(User $user, string $message, array &$context): array
-    {
-        $response = "🤖 **Mirëseerdhët në CarWise AI!**\n\n";
-        $response .= "Unë jam asistenti juaj virtual për të gjitha çështjet e automjeteve. Mund t'ju ndihmoj me:\n\n";
-        $response .= "📝 **Krijimin e raporteve** - Raportoni probleme të automjeteve\n";
-        $response .= "📊 **Kontrollimin e statusit** - Shikoni progresin e raporteve\n";
-        $response .= "💰 **Vlerësimin e kostos** - Merrni parashikime për riparimet\n";
-        $response .= "🔧 **Informacionin e automjeteve** - Detaje për makinat tuaja\n";
-        $response .= "📅 **Programimin e servisit** - Organizoni mirëmbajtjen\n";
-        $response .= "🛠️ **Gjetjen e pjesëve** - Gjeni pjesët e nevojshme\n\n";
-        $response .= "Si mund t'ju ndihmoj sot?";
-        
-        return [
-            'text' => $response,
-            'context' => $context,
-            'actions' => ['show_help_center', 'show_tutorial'],
-            'follow_up' => [
-                'Dëshironi të krijoni një raport të ri?',
-                'A keni probleme me një raport ekzistues?',
-                'Dëshironi të mësoni më shumë për funksionalitetet?'
-            ]
-        ];
-    }
-    
-    /**
-     * Handle vehicle info intent
-     */
-    private function handleVehicleInfo(User $user, string $message, array &$context): array
-    {
-        $vehicles = $user->vehicles()->active()->get();
-        
-        if ($vehicles->isEmpty()) {
-            return [
-                'text' => "Ju nuk keni regjistruar asnjë automjet ende. Dëshironi të shtoni një automjet të ri?",
-                'context' => $context,
-                'actions' => ['redirect_to_vehicle_form']
-            ];
-        }
-        
-        $response = "🚗 **Automjetet tuaja:**\n\n";
-        
-        foreach ($vehicles as $vehicle) {
-            $response .= "**{$vehicle->full_name}**\n";
-            $response .= "📍 Targat: {$vehicle->license_plate}\n";
-            $response .= "📏 Kilometrazhi: {$vehicle->mileage_formatted}\n";
-            $response .= "⛽ Karburanti: {$vehicle->fuel_type}\n";
-            $response .= "🔧 Statusi i servisit: " . $this->getServiceStatusText($vehicle->service_status) . "\n\n";
-        }
-        
-        return [
-            'text' => $response,
-            'context' => $context,
-            'actions' => ['show_vehicles_list', 'add_new_vehicle'],
-            'follow_up' => [
-                'Dëshironi të shtoni një automjet të ri?',
-                'A dëshironi të përditësoni informacionin e një automjeti?',
-                'Dëshironi të shihni detajet e mirëmbajtjes?'
-            ]
-        ];
-    }
-    
-    /**
-     * Handle cost estimate intent
-     */
-    private function handleCostEstimate(User $user, string $message, array &$context): array
-    {
-        $response = "💰 **Vlerësimi i kostos së riparimit**\n\n";
-        $response .= "Për të ju dhënë një vlerësim të saktë, më nevojiten disa informacione:\n\n";
-        $response .= "🚗 **Marka dhe modeli i automjetit**\n";
-        $response .= "🔧 **Lloji i problemit** (motor, frenat, transmisioni, etj.)\n";
-        $response .= "📏 **Kilometrazhi aktual**\n";
-        $response .= "⚡ **Urgjenca e riparimit**\n\n";
-        $response .= "Bazuar në të dhënat tona AI, mund t'ju jap një vlerësim të përafërt të kostos.";
-        
-        return [
-            'text' => $response,
-            'context' => $context,
-            'actions' => ['show_cost_calculator', 'get_ai_estimate'],
-            'follow_up' => [
-                'Cili është marka dhe modeli i automjetit?',
-                'Çfarë problemi po hasni?',
-                'A është një riparim urgjent?'
-            ]
-        ];
-    }
-    
-    /**
-     * Handle schedule service intent
-     */
-    private function handleScheduleService(User $user, string $message, array &$context): array
-    {
-        $vehicles = $user->vehicles()->needsService()->get();
-        
-        $response = "📅 **Programimi i servisit**\n\n";
-        
-        if ($vehicles->isNotEmpty()) {
-            $response .= "🚨 **Automjetet që kanë nevojë për servis:**\n\n";
-            
-            foreach ($vehicles as $vehicle) {
-                $response .= "**{$vehicle->full_name}**\n";
-                $response .= "📏 Kilometrazhi: {$vehicle->mileage_formatted}\n";
-                $response .= "📅 Servisi i fundit: " . ($vehicle->last_service_date ? $vehicle->last_service_date->format('d/m/Y') : 'Nuk është regjistruar') . "\n";
-                $response .= "⏰ Servisi i radhës: " . ($vehicle->next_service_date ? $vehicle->next_service_date->format('d/m/Y') : 'Nuk është programuar') . "\n\n";
-            }
-        } else {
-            $response .= "Të gjitha automjetet tuaja janë në rregull! 🎉\n\n";
-        }
-        
-        $response .= "Dëshironi të programoni një termin për servis?";
-        
-        return [
-            'text' => $response,
-            'context' => $context,
-            'actions' => ['schedule_service', 'show_calendar'],
-            'follow_up' => [
-                'Kur dëshironi të programoni servisin?',
-                'Cili automjet dëshironi të servisoni?',
-                'A keni preferenca për orarin?'
-            ]
-        ];
-    }
-    
-    /**
-     * Handle find parts intent
-     */
-    private function handleFindParts(User $user, string $message, array &$context): array
-    {
-        $response = "🛠️ **Gjetja e pjesëve të automjetit**\n\n";
-        $response .= "Për të gjetur pjesët e duhura, më tregoni:\n\n";
-        $response .= "🚗 **Marka dhe modeli i automjetit**\n";
-        $response .= "🔧 **Pjesa që kërkoni** (frenat, filtri i ajrit, etj.)\n";
-        $response .= "📏 **Viti i prodhimit**\n";
-        $response .= "💰 **Buxheti juaj** (opsional)\n\n";
-        $response .= "Unë do t'ju ndihmoj të gjeni pjesët më të mira dhe më të lira!";
-        
-        return [
-            'text' => $response,
-            'context' => $context,
-            'actions' => ['search_parts', 'show_parts_catalog'],
-            'follow_up' => [
-                'Cila pjesë po kërkoni?',
-                'Për çfarë automjeti është?',
-                'A keni preferenca për markën?'
-            ]
-        ];
-    }
-    
-    /**
-     * Handle emergency intent
-     */
-    private function handleEmergency(User $user, string $message, array &$context): array
-    {
-        $response = "🚨 **EMERGJENCË - Ndihmë e menjëhershme**\n\n";
-        $response .= "Nëse keni një problem urgjent me automjetin tuaj:\n\n";
-        $response .= "📞 **Telefoni emergjencë:** +383 44 123 456\n";
-        $response .= "🚗 **Shërbimi i tërheqjes:** +383 44 789 012\n";
-        $response .= "🏥 **Spitali më i afërt:** Spitali i Prizrenit\n\n";
-        $response .= "Për probleme jo urgjente, mund të krijojmë një raport të ri që do të trajtohet me prioritet të lartë.";
-        
-        return [
-            'text' => $response,
-            'context' => $context,
-            'actions' => ['create_urgent_report', 'call_emergency'],
-            'follow_up' => [
-                'A është kjo një emergjencë e vërtetë?',
-                'Dëshironi të krijojmë një raport urgjent?',
-                'A keni nevojë për ndihmë të menjëhershme?'
-            ]
-        ];
-    }
-    
-    /**
-     * Handle general inquiry
-     */
-    private function handleGeneralInquiry(User $user, string $message, array &$context): array
-    {
-        $response = "🤖 **Mirëseerdhët në CarWise AI!**\n\n";
-        $response .= "Si mund t'ju ndihmoj sot? Mund të më pyesni për:\n\n";
-        $response .= "• Krijimin e raporteve të problemeve\n";
-        $response .= "• Kontrollimin e statusit të raporteve\n";
-        $response .= "• Informacionin e automjeteve\n";
-        $response .= "• Vlerësimin e kostos së riparimit\n";
-        $response .= "• Programimin e servisit\n";
-        $response .= "• Gjetjen e pjesëve\n";
-        $response .= "• Ose çdo gjë tjetër që lidhet me automjetet!";
-        
-        return [
-            'text' => $response,
-            'context' => $context,
-            'actions' => ['show_help_center', 'show_tutorial'],
-            'follow_up' => [
-                'Dëshironi të krijoni një raport të ri?',
-                'A keni probleme me automjetin tuaj?',
-                'Dëshironi të mësoni më shumë për CarWise?'
-            ]
-        ];
-    }
-    
-    /**
-     * Get service status text
-     */
-    private function getServiceStatusText(string $status): string
-    {
-        return match($status) {
-            'good' => '✅ Në rregull',
-            'due_soon' => '⚠️ Duhet servis së shpejti',
-            'overdue' => '🚨 Servis i vonuar',
-            default => '❓ E panjohur'
-        };
-    }
-    
+
     /**
      * Estimate tokens used
      */
@@ -475,72 +347,112 @@ class AiService
         // Rough estimation: 1 token ≈ 4 characters
         return ceil(strlen($text) / 4);
     }
-    
+
     /**
      * Get AI insights for user
      */
     public function getUserInsights(User $user): array
     {
-        $insights = $user->getAiInsights();
-        
-        return [
-            'user_stats' => $insights,
-            'recommendations' => $this->generateUserRecommendations($user, $insights),
-            'predictions' => $this->generatePredictions($user, $insights)
-        ];
-    }
-    
-    /**
-     * Generate user recommendations
-     */
-    private function generateUserRecommendations(User $user, array $insights): array
-    {
-        $recommendations = [];
-        
-        if ($insights['total_reports'] === 0) {
-            $recommendations[] = [
-                'type' => 'welcome',
-                'title' => 'Mirëseerdhët në CarWise!',
-                'message' => 'Krijoni raportin tuaj të parë për të filluar të përdorni platformën.',
-                'priority' => 'high'
+        $vehicles = $user->vehicles()->with('reports')->get();
+        $reports = $user->reports()->latest()->take(10)->get();
+
+        $insights = [];
+
+        // Vehicle insights
+        if ($vehicles->count() > 0) {
+            $totalMileage = $vehicles->sum('mileage');
+            $avgMileage = $totalMileage / $vehicles->count();
+            
+            $insights[] = [
+                'type' => 'vehicle',
+                'title' => 'Kilometrazhi Mesatar',
+                'description' => "Automjetet tuaj kanë një kilometrazh mesatar prej " . number_format($avgMileage) . " km",
+                'priority' => 'medium'
             ];
+
+            $vehiclesNeedingService = $vehicles->filter(function ($vehicle) {
+                return $vehicle->next_service_date && $vehicle->next_service_date <= now()->addDays(30);
+            });
+
+            if ($vehiclesNeedingService->count() > 0) {
+                $insights[] = [
+                    'type' => 'service',
+                    'title' => 'Servis i Planifikuar',
+                    'description' => "{$vehiclesNeedingService->count()} automjet(e) kanë nevojë për servis së shpejti",
+                    'priority' => 'high'
+                ];
+            }
         }
-        
-        if ($insights['average_resolution_time'] > 48) {
-            $recommendations[] = [
+
+        // Report insights
+        if ($reports->count() > 0) {
+            $urgentReports = $reports->where('priority', 'high')->count();
+            if ($urgentReports > 0) {
+                $insights[] = [
+                    'type' => 'report',
+                    'title' => 'Raporte Urgjente',
+                    'description' => "Keni {$urgentReports} raport(e) urgjente që kërkojnë vëmendje",
+                    'priority' => 'high'
+                ];
+            }
+
+            $completedReports = $reports->where('status', 'completed')->count();
+            $completionRate = ($completedReports / $reports->count()) * 100;
+            
+            $insights[] = [
                 'type' => 'performance',
-                'title' => 'Kohëzgjatja e riparimit',
-                'message' => 'Raportet tuaja po marrin më shumë kohë sesa mesatarja. Kontrolloni statusin.',
+                'title' => 'Shkalla e Përfundimit',
+                'description' => "Shkalla juaj e përfundimit të raporteve është " . round($completionRate, 1) . "%",
                 'priority' => 'medium'
             ];
         }
-        
-        $vehicles = $user->vehicles()->needsService()->get();
-        if ($vehicles->isNotEmpty()) {
-            $recommendations[] = [
-                'type' => 'maintenance',
-                'title' => 'Servisi i nevojshëm',
-                'message' => 'Disa automjete kanë nevojë për servis. Programoni një termin.',
-                'priority' => 'high'
-            ];
-        }
-        
-        return $recommendations;
+
+        return $insights;
     }
-    
+
     /**
-     * Generate predictions
+     * Get system analytics
      */
-    private function generatePredictions(User $user, array $insights): array
+    public function getSystemAnalytics(): array
     {
-        $predictions = [];
-        
-        if ($insights['total_reports'] > 0) {
-            $predictions['next_maintenance'] = now()->addMonths(3);
-            $predictions['estimated_yearly_cost'] = $insights['cost_analysis']['total_spent'] * 1.2;
-            $predictions['reliability_trend'] = 'stable';
-        }
-        
-        return $predictions;
+        $totalUsers = User::count();
+        $totalVehicles = Vehicle::count();
+        $totalReports = Report::count();
+        $totalAiChats = AiChat::count();
+
+        $reportsByStatus = Report::selectRaw('status, count(*) as count')
+            ->groupBy('status')
+            ->pluck('count', 'status')
+            ->toArray();
+
+        $reportsByPriority = Report::selectRaw('priority, count(*) as count')
+            ->groupBy('priority')
+            ->pluck('count', 'priority')
+            ->toArray();
+
+        $aiConfidence = AiChat::whereNotNull('confidence')
+            ->avg('confidence') ?? 0;
+
+        return [
+            'overview' => [
+                'total_users' => $totalUsers,
+                'total_vehicles' => $totalVehicles,
+                'total_reports' => $totalReports,
+                'total_ai_interactions' => $totalAiChats,
+            ],
+            'reports' => [
+                'by_status' => $reportsByStatus,
+                'by_priority' => $reportsByPriority,
+            ],
+            'ai_performance' => [
+                'avg_confidence' => round($aiConfidence, 2),
+                'total_interactions' => $totalAiChats,
+            ],
+            'trends' => [
+                'reports_this_month' => Report::whereMonth('created_at', now()->month)->count(),
+                'new_users_this_month' => User::whereMonth('created_at', now()->month)->count(),
+                'ai_interactions_this_month' => AiChat::whereMonth('created_at', now()->month)->count(),
+            ]
+        ];
     }
 }
