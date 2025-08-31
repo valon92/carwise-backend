@@ -34,6 +34,26 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
             ],
+            'ziggy' => [
+                'location' => $request->url(),
+            ],
         ];
+    }
+
+    /**
+     * Handle the incoming request.
+     */
+    public function handle(Request $request, \Closure $next)
+    {
+        $response = parent::handle($request, $next);
+
+        // Ensure proper Inertia response
+        if ($request->header('X-Inertia')) {
+            if (!$response->headers->has('X-Inertia')) {
+                $response->headers->set('X-Inertia', 'true');
+            }
+        }
+
+        return $response;
     }
 }

@@ -1,4 +1,5 @@
-<?php
+All Inertia requests must receive a valid Inertia response, however a plain JSON response was received.
+{"component":"Auth/Register","props":{"errors":{},"auth":{"user":null}},"url":"/register","version":"a903ef53ba0b008df2ed68e86553b1ba","clearHistory":false,"encryptHistory":false}<?php
 
 return [
 

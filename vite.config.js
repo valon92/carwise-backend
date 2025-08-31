@@ -19,4 +19,11 @@ export default defineConfig({
             port: 8002,
         },
     },
+    build: {
+        rollupOptions: {
+            output: {
+                manualChunks: undefined,
+            },
+        },
+    },
 });

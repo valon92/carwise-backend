@@ -78,4 +78,7 @@ createInertiaApp({
             }
         }
     },
+    onError: (errors) => {
+        console.error('Inertia errors:', errors);
+    },
 });
