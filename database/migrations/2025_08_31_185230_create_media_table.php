@@ -14,21 +14,41 @@ return new class extends Migration
         if (!Schema::hasTable('media')) {
             Schema::create('media', function (Blueprint $table) {
                 $table->id();
-                $table->morphs('mediable');
+                $table->morphs('model');
+                $table->uuid('uuid')->nullable()->unique();
+                $table->string('collection_name');
                 $table->string('name');
                 $table->string('file_name');
-                $table->string('mime_type');
-                $table->string('disk')->default('public');
-                $table->string('path');
+                $table->string('mime_type')->nullable();
+                $table->string('disk');
+                $table->string('conversions_disk')->nullable();
                 $table->unsignedBigInteger('size');
-                $table->json('custom_properties')->nullable();
-                $table->json('responsive_images')->nullable();
+                $table->json('manipulations');
+                $table->json('custom_properties');
+                $table->json('generated_conversions');
+                $table->json('responsive_images');
                 $table->unsignedInteger('order_column')->nullable();
                 $table->timestamps();
-
-                $table->index(['mediable_type', 'mediable_id']);
-                $table->index('order_column');
             });
+
+            // Add indexes separately to avoid conflicts
+            if (!Schema::hasIndex('media', 'media_model_type_model_id_index')) {
+                Schema::table('media', function (Blueprint $table) {
+                    $table->index(['model_type', 'model_id']);
+                });
+            }
+
+            if (!Schema::hasIndex('media', 'media_collection_name_index')) {
+                Schema::table('media', function (Blueprint $table) {
+                    $table->index(['collection_name']);
+                });
+            }
+
+            if (!Schema::hasIndex('media', 'media_order_column_index')) {
+                Schema::table('media', function (Blueprint $table) {
+                    $table->index(['order_column']);
+                });
+            }
         }
     }
 
