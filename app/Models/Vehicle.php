@@ -85,16 +85,6 @@ class Vehicle extends Model implements HasMedia
         return $this->hasMany(Report::class);
     }
 
-    public function maintenanceRecords()
-    {
-        return $this->hasMany(MaintenanceRecord::class);
-    }
-
-    public function fuelRecords()
-    {
-        return $this->hasMany(FuelRecord::class);
-    }
-
     // Scopes
     public function scopeActive($query)
     {
@@ -106,24 +96,9 @@ class Vehicle extends Model implements HasMedia
         return $query->where('is_primary', true);
     }
 
-    public function scopeByBrand($query, $brand)
+    public function scopeByUser($query, $userId)
     {
-        return $query->where('brand', $brand);
-    }
-
-    public function scopeByYear($query, $year)
-    {
-        return $query->where('year', $year);
-    }
-
-    public function scopeByFuelType($query, $fuelType)
-    {
-        return $query->where('fuel_type', $fuelType);
-    }
-
-    public function scopeNeedsService($query)
-    {
-        return $query->where('next_service_date', '<=', now()->addDays(30));
+        return $query->where('user_id', $userId);
     }
 
     // Accessors
@@ -132,249 +107,133 @@ class Vehicle extends Model implements HasMedia
         return "{$this->brand} {$this->model} ({$this->year})";
     }
 
-    public function getShortNameAttribute()
+    public function getDisplayNameAttribute()
     {
-        return "{$this->brand} {$this->model}";
+        if ($this->license_plate) {
+            return "{$this->brand} {$this->model} - {$this->license_plate}";
+        }
+        return $this->full_name;
     }
 
     public function getAgeAttribute()
     {
-        return now()->year - $this->year;
+        return date('Y') - $this->year;
     }
 
-    public function getServiceStatusAttribute()
+    public function getIsOverdueForServiceAttribute()
     {
         if (!$this->next_service_date) {
-            return 'unknown';
+            return false;
         }
-
-        if ($this->next_service_date->isPast()) {
-            return 'overdue';
-        }
-
-        if ($this->next_service_date->diffInDays(now()) <= 30) {
-            return 'due_soon';
-        }
-
-        return 'good';
+        return $this->next_service_date->isPast();
     }
 
-    public function getWarrantyStatusAttribute()
+    public function getServiceOverdueDaysAttribute()
     {
-        if (!$this->warranty_expiry) {
-            return 'unknown';
+        if (!$this->next_service_date || !$this->is_overdue_for_service) {
+            return 0;
         }
-
-        if ($this->warranty_expiry->isPast()) {
-            return 'expired';
-        }
-
-        if ($this->warranty_expiry->diffInDays(now()) <= 90) {
-            return 'expiring_soon';
-        }
-
-        return 'active';
+        return $this->next_service_date->diffInDays(now());
     }
 
-    public function getInsuranceStatusAttribute()
+    public function getIsInsuranceExpiredAttribute()
     {
         if (!$this->insurance_expiry) {
-            return 'unknown';
+            return false;
         }
-
-        if ($this->insurance_expiry->isPast()) {
-            return 'expired';
-        }
-
-        if ($this->insurance_expiry->diffInDays(now()) <= 30) {
-            return 'expiring_soon';
-        }
-
-        return 'active';
+        return $this->insurance_expiry->isPast();
     }
 
-    public function getMileageFormattedAttribute()
+    public function getIsWarrantyExpiredAttribute()
     {
-        return number_format($this->mileage) . ' km';
-    }
-
-    public function getFuelEfficiencyFormattedAttribute()
-    {
-        return $this->fuel_efficiency . ' L/100km';
+        if (!$this->warranty_expiry) {
+            return false;
+        }
+        return $this->warranty_expiry->isPast();
     }
 
     // Methods
     public function markAsPrimary()
     {
-        // Remove primary from other vehicles
-        $this->user->vehicles()->update(['is_primary' => false]);
+        // Remove primary from other vehicles of the same user
+        $this->user->vehicles()->where('id', '!=', $this->id)->update(['is_primary' => false]);
         
         // Set this vehicle as primary
         $this->update(['is_primary' => true]);
     }
 
-    public function updateMileage($newMileage)
+    public function addServiceRecord($data)
     {
-        $this->update(['mileage' => $newMileage]);
-    }
-
-    public function addServiceRecord($service)
-    {
-        $history = $this->service_history ?? [];
-        $history[] = [
-            'date' => now()->toDateString(),
-            'service' => $service,
-            'mileage' => $this->mileage
-        ];
+        $serviceHistory = $this->service_history ?? [];
+        $serviceHistory[] = array_merge($data, [
+            'recorded_at' => now()->toISOString(),
+            'recorded_by' => auth()->id()
+        ]);
 
         $this->update([
-            'service_history' => $history,
-            'last_service_date' => now(),
-            'next_service_date' => now()->addMonths(6) // Default 6 months
+            'service_history' => $serviceHistory,
+            'last_service_date' => $data['service_date'] ?? now(),
+            'next_service_date' => $data['next_service_date'] ?? null,
+            'mileage' => $data['mileage'] ?? $this->mileage,
         ]);
     }
 
-    public function getMaintenanceCosts()
+    public function getServiceHistory()
     {
-        return $this->reports()
-            ->where('status', 'completed')
-            ->sum('estimated_cost');
+        return collect($this->service_history ?? [])->sortByDesc('recorded_at');
     }
 
-    public function getAverageRepairCost()
+    public function getModifications()
     {
-        $completedReports = $this->reports()
-            ->where('status', 'completed');
+        return collect($this->modifications ?? [])->sortByDesc('date');
+    }
 
-        if ($completedReports->count() === 0) {
+    public function getTotalServiceCost()
+    {
+        return collect($this->service_history ?? [])
+            ->sum('cost');
+    }
+
+    public function getAverageServiceCost()
+    {
+        $services = collect($this->service_history ?? []);
+        if ($services->isEmpty()) {
             return 0;
         }
-
-        return $completedReports->avg('estimated_cost');
+        return $services->avg('cost');
     }
 
-    public function getMostCommonIssues()
+    public function getLastServiceDate()
     {
-        return $this->reports()
-            ->groupBy('problem_category')
-            ->map(function ($group) {
-                return $group->count();
-            })
-            ->sortDesc()
-            ->take(5);
-    }
-
-    public function getReliabilityScore()
-    {
-        $totalReports = $this->reports()->count();
-        
-        if ($totalReports === 0) {
-            return 100; // Perfect score for new vehicles
+        $services = collect($this->service_history ?? []);
+        if ($services->isEmpty()) {
+            return null;
         }
-
-        $criticalIssues = $this->reports()
-            ->where('severity_level', 'critical')
-            ->count();
-
-        $highIssues = $this->reports()
-            ->where('severity_level', 'high')
-            ->count();
-
-        // Calculate reliability score (100 = perfect, 0 = very unreliable)
-        $score = 100 - ($criticalIssues * 20) - ($highIssues * 10);
-        
-        return max(0, $score);
+        return $services->sortByDesc('service_date')->first()['service_date'] ?? null;
     }
 
-    public function getNextServiceMileage()
+    public function getNextServiceDate()
     {
-        $lastServiceMileage = collect($this->service_history)
-            ->last()['mileage'] ?? 0;
-
-        return $lastServiceMileage + 10000; // Default 10,000 km interval
+        return $this->next_service_date;
     }
 
-    public function needsService()
+    public function getServiceReminderDays()
     {
-        return $this->mileage >= $this->getNextServiceMileage() ||
-               ($this->next_service_date && $this->next_service_date->isPast());
-    }
-
-    public function getAiRecommendations()
-    {
-        return [
-            'reliability_score' => $this->getReliabilityScore(),
-            'maintenance_schedule' => $this->getMaintenanceSchedule(),
-            'cost_analysis' => $this->getCostAnalysis(),
-            'upcoming_services' => $this->getUpcomingServices(),
-            'parts_recommendations' => $this->getPartsRecommendations()
-        ];
-    }
-
-    private function getMaintenanceSchedule()
-    {
-        return [
-            'next_service_mileage' => $this->getNextServiceMileage(),
-            'next_service_date' => $this->next_service_date,
-            'estimated_next_service' => $this->next_service_date ?? now()->addMonths(6)
-        ];
-    }
-
-    private function getCostAnalysis()
-    {
-        return [
-            'total_maintenance_cost' => $this->getMaintenanceCosts(),
-            'average_repair_cost' => $this->getAverageRepairCost(),
-            'cost_per_km' => $this->mileage > 0 ? $this->getMaintenanceCosts() / $this->mileage : 0
-        ];
-    }
-
-    private function getUpcomingServices()
-    {
-        $services = [];
-
-        if ($this->needsService()) {
-            $services[] = 'General maintenance service';
+        if (!$this->next_service_date) {
+            return null;
         }
-
-        if ($this->warranty_expiry && $this->warranty_expiry->diffInDays(now()) <= 90) {
-            $services[] = 'Warranty expiring soon';
-        }
-
-        if ($this->insurance_expiry && $this->insurance_expiry->diffInDays(now()) <= 30) {
-            $services[] = 'Insurance renewal due';
-        }
-
-        return $services;
+        return $this->next_service_date->diffInDays(now());
     }
 
-    private function getPartsRecommendations()
+    public function isServiceDue()
     {
-        $commonIssues = $this->getMostCommonIssues();
-        $recommendations = [];
-
-        foreach ($commonIssues as $issue => $count) {
-            $recommendations[] = [
-                'issue' => $issue,
-                'frequency' => $count,
-                'recommended_parts' => $this->getPartsForIssue($issue)
-            ];
-        }
-
-        return $recommendations;
+        return $this->next_service_date && $this->next_service_date->isPast();
     }
 
-    private function getPartsForIssue($issue)
+    public function isServiceDueSoon($days = 30)
     {
-        // AI-based parts recommendation logic
-        $partsMap = [
-            'engine' => ['spark_plugs', 'air_filter', 'oil_filter'],
-            'brakes' => ['brake_pads', 'brake_rotors', 'brake_fluid'],
-            'transmission' => ['transmission_fluid', 'clutch'],
-            'electrical' => ['battery', 'alternator', 'starter'],
-            'suspension' => ['shock_absorbers', 'springs', 'bushings']
-        ];
-
-        return $partsMap[$issue] ?? [];
+        return $this->next_service_date && 
+               $this->next_service_date->isFuture() && 
+               $this->next_service_date->diffInDays(now()) <= $days;
     }
 }
