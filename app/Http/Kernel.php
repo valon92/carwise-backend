@@ -3,22 +3,26 @@
 namespace App\Http;
 
 use Illuminate\Foundation\Http\Kernel as HttpKernel;
+use Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful;
+
 
 class Kernel extends HttpKernel
 {
     /**
      * Middleware global që do të aplikohen për çdo kërkesë.
+     * Këto middleware ekzekutohen gjithmonë, pavarësisht nëse rruga është 'web' apo 'api'.
      */
     protected $middleware = [
-        \Illuminate\Http\Middleware\HandleCors::class,
         \App\Http\Middleware\TrustProxies::class,
         \Illuminate\Http\Middleware\ValidatePostSize::class,
         \App\Http\Middleware\TrimStrings::class,
         \Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull::class,
+        // \Illuminate\Http\Middleware\HandleCors::class, // HandleCors vendoset në grup specifik ose lëvizet lart
     ];
 
     /**
      * Middleware groups.
+     * Këto middleware aplikohen në varësi të grupit të rrugës.
      */
     protected $middlewareGroups = [
         'web' => [
@@ -30,11 +34,13 @@ class Kernel extends HttpKernel
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ],
 
-       'api' => [
-    \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
-    'throttle:api',
-    \Illuminate\Routing\Middleware\SubstituteBindings::class,
-],
+        'api' => [
+            // HandleCors duhet të jetë ndër të parat në grupin 'api'
+            \Illuminate\Http\Middleware\HandleCors::class, // Shto ose lëviz këtu
+            \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
+            'throttle:api',
+            \Illuminate\Routing\Middleware\SubstituteBindings::class,
+        ],        
 
     ];
 

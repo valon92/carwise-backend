@@ -4,58 +4,66 @@ namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Auth;
 use App\Models\User;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
 {
     public function register(Request $request)
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:50',
-            'email' => 'required|string|email|unique:users',
+        $request->validate([
+            'name' => 'required|string|max:55',
+            'email' => 'required|email|unique:users',
             'password' => 'required|string|min:6'
         ]);
 
         $user = User::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'password' => Hash::make($validated['password'])
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => Hash::make($request->password)
         ]);
 
-        $token = $user->createToken('carwise_token')->plainTextToken;
+        $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
-            'user' => $user,
-            'token' => $token
+            'access_token' => $token,
+            'token_type' => 'Bearer',
+            'user' => $user
         ]);
     }
 
     public function login(Request $request)
     {
-        $credentials = $request->validate([
-            'email' => 'required|string|email',
-            'password' => 'required|string'
+        $request->validate([
+            'email' => 'required|email',
+            'password' => 'required'
         ]);
 
-        if (!Auth::attempt($credentials)) {
-            return response()->json(['message' => 'Të dhënat janë të pasakta'], 401);
+        $user = User::where('email', $request->email)->first();
+
+        if (! $user || ! Hash::check($request->password, $user->password)) {
+            throw ValidationException::withMessages([
+                'email' => ['Kredencialet janë të pasakta.'],
+            ]);
         }
 
-        $user = Auth::user();
-        $token = $user->createToken('carwise_token')->plainTextToken;
+        $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
-            'user' => $user,
-            'token' => $token
+            'access_token' => $token,
+            'token_type' => 'Bearer',
+            'user' => $user
         ]);
     }
 
     public function logout(Request $request)
     {
-        $request->user()->tokens()->delete();
+        $request->user()->currentAccessToken()->delete();
 
-        return response()->json(['message' => 'U çkyç me sukses']);
+        return response()->json([
+            'message' => 'Doli me sukses.'
+        ]);
     }
 }
