@@ -51,7 +51,6 @@ const submit = () => {
                         class="pl-10 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                         v-model="form.name"
                         required
-                        autofocus
                         autocomplete="name"
                         placeholder="Enter your full name"
                     />

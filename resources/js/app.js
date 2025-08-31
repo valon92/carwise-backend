@@ -24,4 +24,19 @@ createInertiaApp({
     progress: {
         color: '#4B5563',
     },
+    // Configure CSRF token for all requests
+    beforeRender: () => {
+        // Set CSRF token for Inertia requests
+        const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        if (token) {
+            window.axios.defaults.headers.common['X-CSRF-TOKEN'] = token;
+        }
+    },
+    // Configure Inertia to send CSRF token with every request
+    beforeVisit: (visit) => {
+        const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        if (token) {
+            visit.headers['X-CSRF-TOKEN'] = token;
+        }
+    },
 });
