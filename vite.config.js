@@ -13,17 +13,10 @@ export default defineConfig({
     ],
     server: {
         host: '127.0.0.1',
-        port: 8002,
+        port: 8000,
         hmr: {
             host: '127.0.0.1',
-            port: 8002,
-        },
-    },
-    build: {
-        rollupOptions: {
-            output: {
-                manualChunks: undefined,
-            },
+            port: 8000,
         },
     },
 });

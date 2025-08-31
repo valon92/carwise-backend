@@ -1,32 +1,35 @@
+<script setup>
+import { Head, Link } from '@inertiajs/vue3';
+import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+
+defineProps({
+    analytics: {
+        type: Object,
+        default: () => ({
+            system_stats: {
+                total_reports: 0,
+                total_users: 0,
+                total_cost_this_month: 0
+            },
+            ai_performance: {
+                total_chats: 0,
+                accuracy_rate: 0,
+                response_time: 0
+            },
+            user_insights: {
+                most_active_users: [],
+                top_vehicles: [],
+                common_issues: []
+            }
+        })
+    }
+});
+</script>
+
 <template>
     <Head title="AI Analytics - CarWise" />
 
     <AuthenticatedLayout>
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-between h-16">
-                    <div class="flex items-center">
-                        <Link :href="route('dashboard')" class="flex items-center space-x-2 text-gray-600 hover:text-gray-900">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
-                            </svg>
-                            <span>Dashboard</span>
-                        </Link>
-                        <span class="mx-2 text-gray-400">/</span>
-                        <Link :href="route('ai.chat')" class="text-gray-600 hover:text-gray-900">
-                            AI Chat
-                        </Link>
-                        <span class="mx-2 text-gray-400">/</span>
-                        <span class="text-gray-900 font-medium">Analytics</span>
-                    </div>
-                    <div class="flex items-center space-x-4">
-                        <div class="flex items-center space-x-2">
-                            <div class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                            <span class="text-sm text-gray-600">AI System Active</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
         <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
             <!-- Header -->
             <div class="mb-8">
@@ -99,193 +102,78 @@
                 <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                     <h3 class="text-lg font-medium text-gray-900 mb-4">🤖 Performanca e AI</h3>
                     <div class="space-y-4">
-                        <div class="flex items-center justify-between">
-                            <span class="text-sm text-gray-600">Shkalla e Zgjidhjes</span>
-                            <span class="text-sm font-medium text-gray-900">{{ analytics.ai_performance.resolution_rate }}%</span>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-600">Saktësia</span>
+                            <span class="text-sm font-medium text-gray-900">{{ analytics.ai_performance.accuracy_rate }}%</span>
                         </div>
                         <div class="w-full bg-gray-200 rounded-full h-2">
-                            <div class="bg-green-600 h-2 rounded-full" :style="{ width: analytics.ai_performance.resolution_rate + '%' }"></div>
+                            <div class="bg-green-600 h-2 rounded-full" :style="{ width: analytics.ai_performance.accuracy_rate + '%' }"></div>
                         </div>
-
-                        <div class="flex items-center justify-between">
-                            <span class="text-sm text-gray-600">Besueshmëria e Lartë</span>
-                            <span class="text-sm font-medium text-gray-900">{{ analytics.ai_performance.high_confidence_rate }}%</span>
+                        
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-600">Koha e Përgjigjes</span>
+                            <span class="text-sm font-medium text-gray-900">{{ analytics.ai_performance.response_time }}s</span>
                         </div>
                         <div class="w-full bg-gray-200 rounded-full h-2">
-                            <div class="bg-blue-600 h-2 rounded-full" :style="{ width: analytics.ai_performance.high_confidence_rate + '%' }"></div>
-                        </div>
-
-                        <div class="flex items-center justify-between">
-                            <span class="text-sm text-gray-600">Vlerësimi Mesatar</span>
-                            <span class="text-sm font-medium text-gray-900">{{ analytics.ai_performance.average_rating }}/5</span>
-                        </div>
-                        <div class="flex items-center">
-                            <div class="flex text-yellow-400">
-                                <svg v-for="i in 5" :key="i" class="w-4 h-4" :class="i <= analytics.ai_performance.average_rating ? 'text-yellow-400' : 'text-gray-300'" fill="currentColor" viewBox="0 0 20 20">
-                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
-                                </svg>
-                            </div>
-                        </div>
-
-                        <div class="flex items-center justify-between">
-                            <span class="text-sm text-gray-600">Koha Mesatare e Përgjigjes</span>
-                            <span class="text-sm font-medium text-gray-900">{{ analytics.ai_performance.average_response_time }}s</span>
+                            <div class="bg-blue-600 h-2 rounded-full" :style="{ width: Math.min(100, (analytics.ai_performance.response_time / 5) * 100) + '%' }"></div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Reports by Status -->
+                <!-- User Activity -->
                 <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                    <h3 class="text-lg font-medium text-gray-900 mb-4">📊 Raportet sipas Statusit</h3>
-                    <div class="space-y-4">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-2">
-                                <div class="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                                <span class="text-sm text-gray-600">Në pritje</span>
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">👥 Aktiviteti i Përdoruesve</h3>
+                    <div class="space-y-3">
+                        <div v-for="user in analytics.user_insights.most_active_users" :key="user.id" class="flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                    <span class="text-sm font-medium text-blue-600">{{ user.name.charAt(0) }}</span>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-medium text-gray-900">{{ user.name }}</p>
+                                    <p class="text-xs text-gray-500">{{ user.reports_count }} raporte</p>
+                                </div>
                             </div>
-                            <span class="text-sm font-medium text-gray-900">{{ analytics.system_stats.reports_by_status.pending }}</span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-2">
-                                <div class="w-3 h-3 bg-blue-500 rounded-full"></div>
-                                <span class="text-sm text-gray-600">Në progres</span>
-                            </div>
-                            <span class="text-sm font-medium text-gray-900">{{ analytics.system_stats.reports_by_status.in_progress }}</span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-2">
-                                <div class="w-3 h-3 bg-green-500 rounded-full"></div>
-                                <span class="text-sm text-gray-600">Përfunduar</span>
-                            </div>
-                            <span class="text-sm font-medium text-gray-900">{{ analytics.system_stats.reports_by_status.completed }}</span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-2">
-                                <div class="w-3 h-3 bg-red-500 rounded-full"></div>
-                                <span class="text-sm text-gray-600">Anuluar</span>
-                            </div>
-                            <span class="text-sm font-medium text-gray-900">{{ analytics.system_stats.reports_by_status.cancelled }}</span>
+                            <span class="text-sm text-gray-500">{{ user.last_activity }}</span>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Reports by Severity -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                    <h3 class="text-lg font-medium text-gray-900 mb-4">⚠️ Raportet sipas Rëndësisë</h3>
-                    <div class="space-y-4">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-2">
-                                <div class="w-3 h-3 bg-green-500 rounded-full"></div>
-                                <span class="text-sm text-gray-600">E ulët</span>
-                            </div>
-                            <span class="text-sm font-medium text-gray-900">{{ analytics.system_stats.reports_by_severity.low }}</span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-2">
-                                <div class="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                                <span class="text-sm text-gray-600">Mesatare</span>
-                            </div>
-                            <span class="text-sm font-medium text-gray-900">{{ analytics.system_stats.reports_by_severity.medium }}</span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-2">
-                                <div class="w-3 h-3 bg-orange-500 rounded-full"></div>
-                                <span class="text-sm text-gray-600">E lartë</span>
-                            </div>
-                            <span class="text-sm font-medium text-gray-900">{{ analytics.system_stats.reports_by_severity.high }}</span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-2">
-                                <div class="w-3 h-3 bg-red-500 rounded-full"></div>
-                                <span class="text-sm text-gray-600">Kritike</span>
-                            </div>
-                            <span class="text-sm font-medium text-gray-900">{{ analytics.system_stats.reports_by_severity.critical }}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Trends -->
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                    <h3 class="text-lg font-medium text-gray-900 mb-4">📈 Tendencat</h3>
-                    <div class="space-y-4">
-                        <div class="flex items-center justify-between">
-                            <span class="text-sm text-gray-600">Raporte këtë muaj</span>
-                            <span class="text-sm font-medium text-gray-900">{{ analytics.trends.reports_trend.current_month }}</span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <span class="text-sm text-gray-600">Raporte muajin e kaluar</span>
-                            <span class="text-sm font-medium text-gray-900">{{ analytics.trends.reports_trend.last_month }}</span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <span class="text-sm text-gray-600">AI përdorim këtë muaj</span>
-                            <span class="text-sm font-medium text-gray-900">{{ analytics.trends.ai_usage_trend.current_month }}</span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <span class="text-sm text-gray-600">AI përdorim muajin e kaluar</span>
-                            <span class="text-sm font-medium text-gray-900">{{ analytics.trends.ai_usage_trend.last_month }}</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- User Insights -->
+            <!-- Top Vehicles -->
             <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
-                <h3 class="text-lg font-medium text-gray-900 mb-4">👤 Insights për Përdoruesin</h3>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div class="text-center">
-                        <div class="text-3xl font-bold text-purple-600">{{ analytics.user_insights.user_stats.total_reports }}</div>
-                        <div class="text-sm text-gray-600">Raporte Totale</div>
-                    </div>
-                    <div class="text-center">
-                        <div class="text-3xl font-bold text-blue-600">{{ analytics.user_insights.user_stats.average_resolution_time }}h</div>
-                        <div class="text-sm text-gray-600">Kohë Mesatare e Zgjidhjes</div>
-                    </div>
-                    <div class="text-center">
-                        <div class="text-3xl font-bold text-green-600">{{ analytics.user_insights.user_stats.cost_analysis.total_spent }}€</div>
-                        <div class="text-sm text-gray-600">Kosto Totale</div>
+                <h3 class="text-lg font-medium text-gray-900 mb-4">🚗 Automjetet Më të Përdorura</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div v-for="vehicle in analytics.user_insights.top_vehicles" :key="vehicle.id" class="border border-gray-200 rounded-lg p-4">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                                <span class="text-lg">🚗</span>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-900">{{ vehicle.brand }} {{ vehicle.model }}</p>
+                                <p class="text-xs text-gray-500">{{ vehicle.year }} - {{ vehicle.reports_count }} raporte</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Recommendations -->
-            <div v-if="analytics.user_insights.recommendations.length > 0" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <h3 class="text-lg font-medium text-gray-900 mb-4">💡 Rekomandimet e AI</h3>
-                <div class="space-y-4">
-                    <div
-                        v-for="recommendation in analytics.user_insights.recommendations"
-                        :key="recommendation.title"
-                        class="flex items-start space-x-3 p-4 rounded-lg"
-                        :class="{
-                            'bg-red-50 border border-red-200': recommendation.priority === 'high',
-                            'bg-yellow-50 border border-yellow-200': recommendation.priority === 'medium',
-                            'bg-green-50 border border-green-200': recommendation.priority === 'low'
-                        }"
-                    >
-                        <div class="flex-shrink-0">
-                            <div class="w-6 h-6 rounded-full flex items-center justify-center"
-                                :class="{
-                                    'bg-red-100': recommendation.priority === 'high',
-                                    'bg-yellow-100': recommendation.priority === 'medium',
-                                    'bg-green-100': recommendation.priority === 'low'
-                                }"
-                            >
-                                <svg class="w-4 h-4"
-                                    :class="{
-                                        'text-red-600': recommendation.priority === 'high',
-                                        'text-yellow-600': recommendation.priority === 'medium',
-                                        'text-green-600': recommendation.priority === 'low'
-                                    }"
-                                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                                >
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                </svg>
+            <!-- Common Issues -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">🔧 Problemet Më të Zakonshme</h3>
+                <div class="space-y-3">
+                    <div v-for="issue in analytics.user_insights.common_issues" :key="issue.name" class="flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                                <span class="text-sm">🔧</span>
                             </div>
+                            <span class="text-sm font-medium text-gray-900">{{ issue.name }}</span>
                         </div>
-                        <div class="flex-1">
-                            <h4 class="text-sm font-medium text-gray-900">{{ recommendation.title }}</h4>
-                            <p class="text-sm text-gray-600 mt-1">{{ recommendation.message }}</p>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-sm text-gray-500">{{ issue.count }} herë</span>
+                            <div class="w-16 bg-gray-200 rounded-full h-2">
+                                <div class="bg-red-600 h-2 rounded-full" :style="{ width: (issue.count / Math.max(...analytics.user_insights.common_issues.map(i => i.count))) * 100 + '%' }"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -293,12 +181,3 @@
         </div>
     </AuthenticatedLayout>
 </template>
-
-<script setup>
-import { Head, Link } from '@inertiajs/vue3'
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
-
-const props = defineProps({
-    analytics: Object
-})
-</script>
