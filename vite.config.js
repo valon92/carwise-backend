@@ -11,4 +11,12 @@ export default defineConfig({
         }),
         vue(),
     ],
+    server: {
+        host: '127.0.0.1',
+        port: 8002,
+        hmr: {
+            host: '127.0.0.1',
+            port: 8002,
+        },
+    },
 });
