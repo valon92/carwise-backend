@@ -1,11 +1,36 @@
-import '../css/app.css';
 import './bootstrap';
+import '../css/app.css';
 
+import { createApp, h } from 'vue';
 import { createInertiaApp } from '@inertiajs/vue3';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
-import { createApp, h } from 'vue';
+import { Ziggy } from './ziggy.js';
 
 const appName = window.document.getElementsByTagName('title')[0]?.innerText || 'Laravel';
+
+// Create a simple route helper function
+function route(name, params = {}) {
+    const route = Ziggy.routes[name];
+    if (!route) {
+        console.warn(`Route "${name}" not found`);
+        return '#';
+    }
+    
+    let url = route.uri;
+    
+    // Replace parameters in the URL
+    Object.keys(params).forEach(key => {
+        url = url.replace(`{${key}}`, params[key]);
+    });
+    
+    // Remove any remaining parameters
+    url = url.replace(/\{[^}]+\}/g, '');
+    
+    return Ziggy.url + '/' + url.replace(/^\/+/, '');
+}
+
+// Make route available globally
+window.route = route;
 
 createInertiaApp({
     title: (title) => `${title} - ${appName}`,
