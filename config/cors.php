@@ -6,6 +6,8 @@ return [
     // VERY IMPORTANT: This MUST match your frontend's exact URL
     'allowed_origins' => [
         'http://localhost:5173',    // Keep if your frontend runs on localhost
+        'http://127.0.0.1:8002',    // Add this for the current server
+        'http://localhost:8002',    // Add this for localhost variant
     ],
     'allowed_origins_patterns' => [], // Keep empty unless you need regex patterns
     'allowed_headers' => ['*'],       // Allow all headers
